@@ -1,0 +1,34 @@
+name: build
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Tests + simulation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Godot
+        run: |
+          V=$(cat .godot-version)
+          curl -sSL -o godot.zip "https://github.com/godotengine/godot/releases/download/${V}-stable/Godot_v${V}-stable_linux.x86_64.zip"
+          unzip -q godot.zip && rm godot.zip
+          mkdir -p "$HOME/bin" && mv "Godot_v${V}-stable_linux.x86_64" "$HOME/bin/godot"
+          echo "$HOME/bin" >> "$GITHUB_PATH"
+      - name: Import project
+        run: godot --headless --import --path . || true
+      - name: Unit tests
+        run: godot --headless --path . --script res://tests/run_tests.gd
+      - name: Simulation (5000 runs)
+        run: |
+          godot --headless --path . --script res://sim/run_sim.gd -- --runs 5000 --all --out sim_report.md
+          { echo '## Bot simulation'; echo '```'; cat sim_report.md; echo '```'; } >> "$GITHUB_STEP_SUMMARY"

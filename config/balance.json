@@ -1,0 +1,25 @@
+{
+  "hand_size": 4,
+  "boss_hand_size": 3,
+  "retain": 1,
+  "deck_cap": 9,
+  "deck_min": 4,
+  "lives": 3,
+  "short_floors": [3, 4, 5],
+  "graded_threshold": 5,
+  "spade_multiplier": 1.5,
+  "club_pair_bonus": 2,
+  "ace_value": 14,
+  "ace_sac_enabled": true,
+  "ace_sac_own_color": true,
+  "ace_sac_suit_effects": false,
+  "joker_curse_value": 14,
+  "red_joker_after_floor": 11,
+  "mods_enabled": true,
+  "jokers_enabled": true,
+  "heart_carry_mode": "next_round",
+  "target": {
+    "human_win_rate": 0.25,
+    "bot_win_rate_band": [0.15, 0.22]
+  }
+}

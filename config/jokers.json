@@ -1,0 +1,18 @@
+{
+  "H": {
+    "red": { "effect": "dual", "desc": "Kortet räknas som båda färgerna." },
+    "black": { "effect": "return_king", "desc": "Ett besegrat kungkort läggs tillbaka sist i bosshögen." }
+  },
+  "D": {
+    "red": { "effect": "innate", "desc": "Kortet hamnar alltid i första handen." },
+    "black": { "effect": "shield", "desc": "Sköld 14." }
+  },
+  "S": {
+    "red": { "effect": "double", "desc": "Kortet har dubbelt värde." },
+    "black": { "effect": "attack", "desc": "Attack 14." }
+  },
+  "C": {
+    "red": { "effect": "draw2", "desc": "Dra 2 kort när kortet spelas." },
+    "black": { "effect": "double_reveal", "desc": "Vänd upp de två nästa fiendekorten samtidigt." }
+  }
+}
