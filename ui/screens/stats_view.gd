@@ -1,0 +1,55 @@
+extends RefCounted
+## Local play statistics: runs, win rate vs target, losses per floor, per theme king and mod ace.
+
+const Style := preload("res://ui/style.gd")
+const Store := preload("res://ui/store.gd")
+const SUITS := ["H", "D", "S", "C"]
+
+
+func build(main) -> Control:
+	var d := Store.stats()
+	var runs := int(d["runs"])
+	var wins := int(d["wins"])
+	var target := float(main.balance().get("target", {}).get("human_win_rate", 0.25)) * 100.0
+	var lines: Array = []
+	lines.append("[b]Omgångar:[/b] %d   [b]Vinster:[/b] %d (%s)" % [runs, wins, _pct(wins, runs)])
+	lines.append("Mål för mänskliga spelare: ~%d %%" % int(target))
+	lines.append("")
+	lines.append("[b]Förluster per våning[/b]")
+	for f in range(3, 14):
+		var n := int(d["loss_floor"].get(str(f), 0))
+		if n > 0:
+			lines.append("  %s: %d  %s" % [Style.floor_text(f), n, "█".repeat(mini(n, 30))])
+	for pair in [["theme", "Per temakung"], ["mod", "Per modess"]]:
+		lines.append("")
+		lines.append("[b]%s[/b]" % pair[1])
+		for s in SUITS:
+			var v: Array = d[pair[0]].get(s, [0, 0])
+			lines.append("  %s  %d/%d  (%s)" % [Style.SUIT_SYM[s], int(v[0]), int(v[1]), _pct(int(v[0]), int(v[1]))])
+	var v := VBoxContainer.new()
+	v.add_child(Style.label("Statistik", 40, Style.GOLD))
+	var rt := RichTextLabel.new()
+	rt.bbcode_enabled = true
+	rt.text = "\n".join(lines)
+	rt.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	rt.add_theme_font_size_override("normal_font_size", 26)
+	rt.add_theme_font_size_override("bold_font_size", 26)
+	v.add_child(rt)
+	var p := Style.panel(v)
+	var h := HBoxContainer.new()
+	var reset := Style.button("Nollställ", Style.RED, 24)
+	reset.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	reset.pressed.connect(func():
+		Store.reset_stats()
+		p.queue_free())
+	h.add_child(reset)
+	var close := Style.button("Stäng", Style.BLACK, 24)
+	close.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	close.pressed.connect(p.queue_free)
+	h.add_child(close)
+	v.add_child(h)
+	return p
+
+
+static func _pct(a: int, b: int) -> String:
+	return "–" if b == 0 else "%.0f %%" % (100.0 * a / b)

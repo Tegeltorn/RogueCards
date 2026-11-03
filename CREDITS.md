@@ -1,8 +1,8 @@
 # Credits
 
 ## Fonts
-- **Pixelify Sans** by The Pixelify Sans Project Authors (https://github.com/eifetx/Pixelify-Sans).
-  Licensed under the SIL Open Font License 1.1. See `assets/fonts/OFL-PixelifySans.txt`.
+- **Jersey 10** by The Soft Type Project Authors (https://github.com/scfried/soft-type-jersey).
+  Licensed under the SIL Open Font License 1.1. See `assets/fonts/OFL-Jersey10.txt`.
 - **Noto Sans Symbols 2** (subset with card suit symbols, `assets/fonts/SuitSymbols.ttf`) by Google.
   Licensed under the SIL Open Font License 1.1. See `assets/fonts/OFL-NotoSansSymbols2.txt`.
 

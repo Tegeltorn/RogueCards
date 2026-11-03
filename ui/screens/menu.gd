@@ -1,0 +1,108 @@
+extends Control
+## Title screen. Long-press the title (0.8 s) to unlock and open the debug menu.
+
+const Style := preload("res://ui/style.gd")
+const CardView := preload("res://ui/card_view.gd")
+
+var main
+var _hold := 0.0
+var _holding := false
+var _title: Label
+var _seed_edit: LineEdit
+
+
+func enter() -> void:
+	var v := VBoxContainer.new()
+	v.alignment = BoxContainer.ALIGNMENT_CENTER
+	v.add_theme_constant_override("separation", 22)
+	var m := Style.full(MarginContainer.new())
+	for s in ["left", "right"]:
+		m.add_theme_constant_override("margin_" + s, 60)
+	add_child(m)
+	m.add_child(v)
+
+	var fan := Control.new()
+	fan.custom_minimum_size = Vector2(0, 250)
+	fan.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	v.add_child(fan)
+	var suits := ["S", "H", "C", "D"]
+	for i in 4:
+		var cv := CardView.new()
+		cv.set_interactive(false)
+		cv.rank = 14
+		cv.suit = suits[i]
+		cv.setup(null, Vector2(130, 182))
+		cv.position = Vector2(300 - 2 * 80 + i * 80 - 65 + 40, 40 + absf(i - 1.5) * 18)
+		cv.rotation = (i - 1.5) * 0.18
+		fan.add_child(cv)
+		cv.land(0.1 * i)
+
+	_title = Style.label("ROGUECARDS", 76, Style.GOLD)
+	_title.add_theme_constant_override("outline_size", 14)
+	_title.mouse_filter = Control.MOUSE_FILTER_STOP
+	_title.gui_input.connect(_on_title_input)
+	_title.pivot_offset = Vector2(300, 50)
+	v.add_child(_title)
+	v.add_child(Style.label("Ett roguelike-deckbuilder med en vanlig kortlek", 24, Style.MUTED))
+
+	var play := Style.button("Ny omgång", Style.RED, 38)
+	play.custom_minimum_size.y = 96
+	play.pressed.connect(func(): main.sfx.play("select"); main.new_run())
+	v.add_child(play)
+
+	var h := HBoxContainer.new()
+	_seed_edit = LineEdit.new()
+	_seed_edit.placeholder_text = "seed"
+	_seed_edit.virtual_keyboard_type = LineEdit.KEYBOARD_TYPE_NUMBER
+	_seed_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_seed_edit.custom_minimum_size.y = 76
+	h.add_child(_seed_edit)
+	var sb := Style.button("Spela seed", Style.BLUE, 26)
+	sb.pressed.connect(func():
+		var t := _seed_edit.text.strip_edges()
+		if t.is_valid_int():
+			main.new_run(int(t)))
+	h.add_child(sb)
+	v.add_child(h)
+
+	var stats := Style.button("Statistik", Style.BLACK, 28)
+	stats.pressed.connect(func(): main.open_stats())
+	v.add_child(stats)
+
+	var toggles := HBoxContainer.new()
+	toggles.alignment = BoxContainer.ALIGNMENT_CENTER
+	for key in ["crt", "sound"]:
+		var cb := CheckBox.new()
+		cb.text = "CRT-filter" if key == "crt" else "Ljud"
+		cb.button_pressed = bool(main.settings.get(key, true))
+		cb.focus_mode = Control.FOCUS_NONE
+		cb.toggled.connect(func(on):
+			main.settings[key] = on
+			main.apply_settings())
+		toggles.add_child(cb)
+	v.add_child(toggles)
+	var hint := Style.label("Håll inne titeln för debugmenyn", 18, Color(1, 1, 1, 0.35))
+	v.add_child(hint)
+
+
+func _process(delta: float) -> void:
+	if _title == null:
+		return
+	_title.rotation = sin(Time.get_ticks_msec() / 700.0) * 0.03
+	if _holding:
+		_hold += delta
+		_title.scale = Vector2.ONE * (1.0 + minf(_hold, 0.8) * 0.15)
+		if _hold >= 0.8:
+			_holding = false
+			_title.scale = Vector2.ONE
+			main.debug_unlocked = true
+			main.sfx.play("exact")
+			main.open_debug()
+	else:
+		_title.scale = _title.scale.lerp(Vector2.ONE, 0.2)
+
+
+func _on_title_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		_holding = event.pressed
+		_hold = 0.0

@@ -1,5 +1,10 @@
 name: build
 
+# Every push: unit tests + bot simulation, then web build (GitHub Pages) and Android debug APK (Releases).
+#  - https://<owner>.github.io/<repo>/                 latest push from any branch
+#  - https://<owner>.github.io/<repo>/branch/<name>/   latest push of that branch
+#  - Releases → "build-<branch>"                       debug APK for that branch
+
 on:
   push:
   workflow_dispatch:
@@ -28,7 +33,100 @@ jobs:
         run: godot --headless --import --path . || true
       - name: Unit tests
         run: godot --headless --path . --script res://tests/run_tests.gd
+      - name: UI smoke test (2 full runs through the real UI)
+        run: timeout 600 godot --headless --path . --script res://tests/ui_smoke.gd -- --runs 2
       - name: Simulation (5000 runs)
         run: |
           godot --headless --path . --script res://sim/run_sim.gd -- --runs 5000 --all --out sim_report.md
           { echo '## Bot simulation'; echo '```'; cat sim_report.md; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+
+  export:
+    name: Export web + Android
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Branch name
+        run: echo "BRANCH_SLUG=$(echo '${{ github.ref_name }}' | tr '/' '-' | tr -cd '[:alnum:]._-')" >> "$GITHUB_ENV"
+      - name: Cache export templates
+        id: cache-templates
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/share/godot/export_templates
+          key: godot-templates-${{ hashFiles('.godot-version') }}
+      - name: Install Godot + export templates
+        run: |
+          V=$(cat .godot-version)
+          curl -sSL -o godot.zip "https://github.com/godotengine/godot/releases/download/${V}-stable/Godot_v${V}-stable_linux.x86_64.zip"
+          unzip -q godot.zip && rm godot.zip
+          mkdir -p "$HOME/bin" && mv "Godot_v${V}-stable_linux.x86_64" "$HOME/bin/godot"
+          echo "$HOME/bin" >> "$GITHUB_PATH"
+          T="$HOME/.local/share/godot/export_templates/${V}.stable"
+          if [ ! -f "$T/web_nothreads_release.zip" ]; then
+            curl -sSL -o tpl.tpz "https://github.com/godotengine/godot/releases/download/${V}-stable/Godot_v${V}-stable_export_templates.tpz"
+            mkdir -p "$T" && unzip -q tpl.tpz -d tpl && mv tpl/templates/* "$T/" && rm -rf tpl tpl.tpz
+          fi
+          ls "$T"
+      - name: Import project
+        run: godot --headless --import --path . || true
+      - name: Export web
+        run: |
+          mkdir -p build/web
+          godot --headless --path . --export-release "Web" build/web/index.html
+          ls -la build/web
+          test -f build/web/index.wasm
+      - name: Deploy web (latest)
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: build/web
+          keep_files: true
+          commit_message: "web: ${{ github.ref_name }} ${{ github.sha }}"
+      - name: Deploy web (branch)
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: build/web
+          destination_dir: branch/${{ env.BRANCH_SLUG }}
+          keep_files: true
+          commit_message: "web: ${{ github.ref_name }} ${{ github.sha }} (branch)"
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Export Android debug APK
+        run: |
+          V=$(cat .godot-version)
+          MAJ=$(echo "$V" | cut -d. -f1-2)
+          keytool -genkeypair -v -keystore "$HOME/debug.keystore" -storepass android -alias androiddebugkey \
+            -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+          SDK="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
+          mkdir -p "$HOME/.config/godot"
+          cat > "$HOME/.config/godot/editor_settings-${MAJ}.tres" <<EOT
+          [gd_resource type="EditorSettings" format=3]
+
+          [resource]
+          export/android/android_sdk_path = "${SDK}"
+          export/android/java_sdk_path = "${JAVA_HOME}"
+          export/android/debug_keystore = "$HOME/debug.keystore"
+          export/android/debug_keystore_user = "androiddebugkey"
+          export/android/debug_keystore_pass = "android"
+          EOT
+          cp "$HOME/.config/godot/editor_settings-${MAJ}.tres" "$HOME/.config/godot/editor_settings-4.tres"
+          export GODOT_ANDROID_KEYSTORE_DEBUG_PATH="$HOME/debug.keystore"
+          export GODOT_ANDROID_KEYSTORE_DEBUG_USER="androiddebugkey"
+          export GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD="android"
+          mkdir -p build/android
+          godot --headless --path . --export-debug "Android" build/android/RogueCards.apk
+          ls -la build/android
+      - name: Publish APK release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="build-${BRANCH_SLUG}"
+          gh release delete "$TAG" --yes --cleanup-tag || true
+          gh release create "$TAG" build/android/RogueCards.apk \
+            --prerelease --target "${{ github.sha }}" \
+            --title "Build ${{ github.ref_name }}" \
+            --notes "Debug APK from ${{ github.sha }}. Web: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/branch/${BRANCH_SLUG}/"
