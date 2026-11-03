@@ -3,8 +3,9 @@
 A solo roguelike deckbuilder played with a standard 54-card deck. This repo is a mobile playtest prototype made in Godot 4. The rules are also playable on a table: see [`RULES.md`](RULES.md) (Swedish).
 
 ## Play
-- **Web (phone browser):** https://tegeltorn.github.io/RogueCards/ is built from `main`. Every other branch is deployed to `https://tegeltorn.github.io/RogueCards/preview/<branch>/`.
-- **Android:** download the APK from the rolling release `build-<branch>` under *Releases*.
+- **Web (phone browser):** https://tegeltorn.github.io/RogueCards/ always has the latest push from any branch. Each branch also gets its own copy at `https://tegeltorn.github.io/RogueCards/branch/<branch>/`.
+  GitHub Pages only works if the repo is public (or on GitHub Pro). If the page doesn't show up after the first build, go to Settings → Pages and pick Source: `gh-pages` branch.
+- **Android:** download `RogueCards.apk` from the release `build-<branch>` under *Releases* and install it ("allow unknown sources").
 
 CI builds, tests and deploys on every push (`.github/workflows/build.yml`). You don't need a computer.
 

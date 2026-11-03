@@ -8,7 +8,7 @@ extends SceneTree
 ##   --heart-carry next_round|next_attack
 ##   --set key=value     override any balance key (repeatable), e.g. --set deck_cap=6
 ##   --preset path       load a balance JSON (e.g. res://config/presets/spec.json)
-##   --parity            settings that match sim/reference/balance_sim.py and print its numbers
+##   --parity            spec values + settings that match sim/reference/balance_sim_fixed.py, with its numbers
 ##   --all               default report + parity report
 ##   --out path          also write the report (markdown) to a file
 
@@ -40,7 +40,8 @@ func _init() -> void:
 		reports.append(SimLib.format_report("Current balance" + (" (" + str(ov) + ")" if not ov.is_empty() else ""), st))
 
 	if args.has("parity") or args.has("all"):
-		var ov2 := base.duplicate(true)
+		# Parity always starts from the spec values (the Python reference models those).
+		var ov2 := Balance.load_json("res://config/presets/spec.json")
 		for k in SimLib.PARITY:
 			ov2[k] = SimLib.PARITY[k]
 		SimLib.apply_sets(ov2, args["set"])
