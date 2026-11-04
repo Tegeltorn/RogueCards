@@ -130,7 +130,7 @@ static func _burns_left(e) -> int:
 		return 0
 	var lim := int(e.state.balance.get("burn_limit", 0))
 	var left: int = 2 if lim <= 0 else lim - int(e.state.burns_this_round)
-	return clampi(left, 0, maxi(0, e.state.deck.size() - int(e.state.balance["deck_min"])))
+	return clampi(left, 0, maxi(0, e.state.deck.size() - int(e.state.balance.get("burn_min_deck", 0)) + 1))
 
 
 static func _deck_avg(s) -> float:

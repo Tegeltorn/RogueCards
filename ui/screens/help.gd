@@ -28,6 +28,10 @@ static func card_info(b: Dictionary, c) -> String:
 	return "\n".join(lines)
 
 
+static func _no_refill(b: Dictionary) -> String:
+	return " (no refill next round)" if bool(b.get("burn_no_refill", false)) else ""
+
+
 ## What overpowering does with the current balance.
 static func _overpower_effect(b: Dictionary) -> String:
 	var n := int(b.get("overpower_draw", 0))
@@ -38,9 +42,9 @@ static func _overpower_effect(b: Dictionary) -> String:
 static func burn_text(b: Dictionary, c) -> String:
 	match str(b.get("burn_mode", "off")):
 		"double":
-			return "Burn: %s %d this round, then it is gone for good." % ["blocks" if c.base_red() else "attacks", c.rank * 2]
+			return "Burn: %s %d this round, then it is gone for good%s." % ["blocks" if c.base_red() else "attacks", c.rank * 2, _no_refill(b)]
 		"swap":
-			return "Burn: %s %d this round, then it is gone for good." % ["attacks" if c.base_red() else "blocks", c.rank]
+			return "Burn: %s %d this round, then it is gone for good%s." % ["attacks" if c.base_red() else "blocks", c.rank, _no_refill(b)]
 	return ""
 
 
@@ -152,7 +156,7 @@ static func rules_overlay(main) -> Control:
 	lines.append("")
 	lines.append("%s  The suit of your last card that counted against the floor's final enemy card decides: ♠ pick any beaten card · ♣ reveal 2, take 1, remove 1 · ♥ heal a life · ♦ reveal 2, take both. %s" % [H % "REWARDS",
 		("You may decline any card to keep your deck lean." if int(b["deck_cap"]) <= 0 else "Your deck holds up to %d cards; when it is full you swap or decline." % int(b["deck_cap"]))])
-	lines.append("%s  Every floor has 4 enemy cards: %d up to Queen, then the four kings (%d cards in hand). Tap the ace at the top to see your mod." % [H % "THE ROAD", int(b.get("first_floor", 4)), int(b["boss_hand_size"])])
+	lines.append("%s  Every floor has 4 enemy cards: %d up to Queen, then the four kings. The face cards (Jack, Queen, King) demand tribute: only %d cards in hand. Tap the ace at the top to see your mod." % [H % "THE ROAD", int(b.get("first_floor", 4)), int(b["face_hand_size"])])
 	var txt := "\n".join(lines)
 	var v := VBoxContainer.new()
 	var scroll := ScrollContainer.new()
@@ -166,8 +170,11 @@ static func rules_overlay(main) -> Control:
 
 static func _burn_limits(b: Dictionary) -> String:
 	var lim := int(b.get("burn_limit", 0))
-	return ("Once per round. " if lim == 1 else ("Up to %d per round. " % lim if lim > 1 else "")) \
-		+ "Your deck never goes below %d cards." % int(b["deck_min"])
+	var t := ("Once per round. " if lim == 1 else ("Up to %d per round. " % lim if lim > 1 else "As many as you like. "))
+	t += "Only while your deck has %d or more cards." % int(b.get("burn_min_deck", 0))
+	if bool(b.get("burn_no_refill", false)):
+		t += " The price: after a round you burned in, your hand is not refilled."
+	return t
 
 
 ## Lives overlay: remaining and lost aces, and the sacrifice buttons.

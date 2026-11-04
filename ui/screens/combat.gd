@@ -96,8 +96,8 @@ class Fire:
 			draw_colored_polygon(inner, Color(Style.GOLD, 0.9 * a))
 		draw_line(Vector2(base.x - size.y * 0.42, base.y + 2), Vector2(base.x + size.y * 0.42, base.y + 2), Color(Style.INK, 0.6 * a), 4, true)
 		var tc := Style.GOLD if hot else Color(Style.WHITE, a)
-		draw_string(font, Vector2(size.x * 0.44, size.y * 0.45), "BURN", HORIZONTAL_ALIGNMENT_LEFT, size.x * 0.54, 26, tc)
-		draw_string(font, Vector2(size.x * 0.44, size.y * 0.78), caption, HORIZONTAL_ALIGNMENT_LEFT, size.x * 0.54, 17, Color(Style.MUTED, a))
+		draw_string(font, Vector2(size.x * 0.44, size.y * 0.36), "BURN", HORIZONTAL_ALIGNMENT_LEFT, size.x * 0.54, 26, tc)
+		draw_multiline_string(font, Vector2(size.x * 0.44, size.y * 0.6), caption, HORIZONTAL_ALIGNMENT_LEFT, size.x * 0.54, 16, 2, Color(Style.MUTED, a))
 
 
 var main
@@ -600,9 +600,11 @@ func _update_fire() -> void:
 		return
 	_fire.active = _e.can_burn()
 	if _fire.active:
-		_fire.caption = "x2, then gone for good" if _e.burn_mode() == "double" else "other colour, gone for good"
-	elif s.deck.size() <= int(s.balance["deck_min"]):
-		_fire.caption = "deck needs %d+ cards" % (int(s.balance["deck_min"]) + 1)
+		_fire.caption = "x2, then gone" if _e.burn_mode() == "double" else "other colour, then gone"
+		if bool(s.balance.get("burn_no_refill", false)):
+			_fire.caption += "\nno refill next round"
+	elif s.deck.size() < int(s.balance.get("burn_min_deck", 0)):
+		_fire.caption = "deck needs %d+ cards" % int(s.balance["burn_min_deck"])
 	else:
 		_fire.caption = "used this round"
 
@@ -1027,6 +1029,9 @@ func play_event(ev: Dictionary) -> float:
 					any = true
 			_layout_hand()
 			return 0.3 if any else 0.15
+		Ev.REFILL_SKIPPED:
+			main.toast("NO NEW CARDS", Style.MUTED, 680, 40)
+			return 0.35
 		Ev.CARD_BURNED:
 			# Dragged cards are already burning; burned another way (tests, bot) they burn here.
 			if _hand_views.has(ev["id"]):

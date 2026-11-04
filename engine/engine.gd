@@ -29,7 +29,7 @@ var journal: Array = []
 var _start: Dictionary = {}
 var _depth := 0  # > 0 while an action runs (actions calling actions are not journaled twice)
 
-const SAVE_VERSION := 2
+const SAVE_VERSION := 3
 
 
 # ---------------------------------------------------------------- setup
@@ -155,6 +155,7 @@ func _start_floor(f: int) -> void:
 	state.played = []
 	state.retained = []
 	state.carry_shield = 0
+	state.skip_refill = false
 	_emit(Ev.FLOOR_STARTED, {"floor": state.floor_num, "count": state.enemy_pile.size()})
 	_next_round()
 
@@ -178,10 +179,16 @@ func _next_round() -> void:
 	if not keep_hand():
 		state.hand = state.retained
 	state.retained = []
-	var limit := int(state.balance["boss_hand_size"] if state.is_boss() else state.balance["hand_size"])
+	# The face cards (Jack, Queen, King floors) demand tribute: a smaller hand.
+	var limit := int(state.balance["face_hand_size"] if state.floor_num >= 11 else state.balance["hand_size"])
 	# Draw up to the hand size, but always at least `min_draw` cards.
 	var to_draw := maxi(limit - state.hand.size(), int(state.balance.get("min_draw", 0))) + state.bonus_draw
 	state.bonus_draw = 0
+	if state.skip_refill:
+		# You burned last round: no new cards this time.
+		state.skip_refill = false
+		to_draw = 0
+		_emit(Ev.REFILL_SKIPPED, {"hand": state.hand.size()})
 	for i in to_draw:
 		var d = _draw_one()
 		if d == null:
@@ -442,15 +449,16 @@ func _draw_now(n: int) -> void:
 
 ## Burn: a card from your hand burns up and leaves your deck for good. This round it counts as
 ## double its rank in its own colour ("double") or as its rank in the other colour ("swap"),
-## with no suit effects. At most `burn_limit` per round (0 = no limit); the deck never shrinks
-## below `deck_min`.
+## with no suit effects. At most `burn_limit` per round (0 = no limit), only while the deck has at
+## least `burn_min_deck` cards. With `burn_no_refill`, a round you burned in means no hand refill
+## at the start of the next round.
 func can_burn(c = null) -> bool:
 	if state.phase != Phase.PLAY or burn_mode() == "off":
 		return false
 	var lim := int(state.balance.get("burn_limit", 0))
 	if lim > 0 and state.burns_this_round >= lim:
 		return false
-	if state.deck.size() <= int(state.balance["deck_min"]):
+	if state.deck.size() < int(state.balance.get("burn_min_deck", 0)):
 		return false
 	return c == null or state.hand.has(c)
 
@@ -469,6 +477,8 @@ func _do_burn_card(card_id: int) -> bool:
 	state.played.append(c)
 	state.burns_this_round += 1
 	state.burned_total += 1
+	if bool(state.balance.get("burn_no_refill", false)):
+		state.skip_refill = true
 	_emit(Ev.CARD_BURNED, {"card": c.label(), "id": c.id, "value": burn_value(c),
 		"colour": "red" if counts_red(c) else "black", "deck": state.deck.size()})
 	_draw_now(_check_overpower())

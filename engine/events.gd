@@ -14,6 +14,7 @@ const CARDS_PLAYED := "cards_played"
 const PERFECT := "perfect"
 const CARD_DISCARDED := "card_discarded"
 const CARD_BURNED := "card_burned"
+const REFILL_SKIPPED := "refill_skipped"
 const OVERPOWER := "overpower"
 const ACE_SACRIFICED := "ace_sacrificed"
 const BLOCKED := "blocked"
@@ -63,6 +64,7 @@ static func describe(e: Dictionary) -> String:
 		CARDS_PLAYED: return "Played %s" % ", ".join(e.get("cards", []))
 		PERFECT: return "Perfect %s! +%d card next hand" % [e.get("kind", ""), e.get("draw", 1)]
 		CARD_DISCARDED: return "Discarded %s" % e.get("card", "")
+		REFILL_SKIPPED: return "No new cards this round (you burned a card)"
 		CARD_BURNED: return "Burned %s: counts %d as %s, gone for good (deck %d)" % [e.get("card", ""), e.get("value", 0),
 			"block" if e.get("colour") == "red" else "attack", e.get("deck", 0)]
 		OVERPOWER: return "Overpower! %d vs attack %d: %s discarded, draw 1" % [e.get("attack", 0), e.get("enemy", 0), ", ".join(e.get("cards", []))]

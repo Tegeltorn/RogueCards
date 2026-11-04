@@ -12,11 +12,11 @@ Play the floors in order: 4, 5 … 10, Jack, Queen and finally the kings. Every 
 
 Each round:
 1. **Reveal** the top enemy card. Black = attack, red = shield. Its value is its rank.
-2. **Fill your hand** up to `hand_size` cards (`boss_hand_size` against the kings). Cards you didn't play last round are still in your hand. If the draw pile is empty, shuffle the discard pile into a new one.
+2. **Fill your hand** up to `hand_size` cards. The face cards demand tribute: on the Jack, Queen and King floors only up to `face_hand_size`. If you burned a card last round, skip this step (`burn_no_refill`). Cards you didn't play last round are still in your hand. If the draw pile is empty, shuffle the discard pile into a new one.
 3. **Play** any cards you like. Only the right colour counts against the enemy: red cards block attacks, black cards break shields. Cards of the wrong colour still trigger their own effects (♦ draws, ♥ stores shield).
    - **Attack:** if your block is enough the attack is beaten. Otherwise you take damage, and (with `failed_attack_returns`) the attack card goes to the bottom of the enemy pile and comes back. Sacrificing an ace to block it is often worth it.
    - **Shield:** if your attack is enough the shield is beaten. Otherwise it goes to the bottom of the enemy pile and comes back. Cards that can't break it still help you cycle: play them and they go to the discard pile, so you draw fresh ones next round. If you can't ever break it, the run is stuck: start a new one.
-   - **Burn:** you may burn up to `burn_limit` card per round from your hand (`burn_mode` `double`): it counts **double its rank in its own colour** this round, with no suit effect (no ♦ draw, no ♥ storing, no ♠ × 1.5, no ♣ bonus). Then it is gone for good: put it back in the box. Your deck can never go below `deck_min` cards. (With `burn_mode` `swap` it counts its rank in the other colour instead.)
+   - **Burn:** while your deck has at least `burn_min_deck` cards, you may burn cards from your hand, as many as you like (`burn_limit` 0 = no limit). A burned card counts **double its rank in its own colour** this round (`burn_mode` `double`), with no suit effect (no ♦ draw, no ♥ storing, no ♠ × 1.5, no ♣ bonus). Then it is gone for good: put it back in the box. The price: your hand is not refilled at the start of the next round. (With `burn_mode` `swap` it counts its rank in the other colour instead.)
 4. **End your turn:** the revealed enemy card is resolved as above. Every played card goes to the discard pile; unplayed cards stay in your hand (`keep_hand`). With `keep_hand` off, you instead keep up to `retain` unplayed cards and discard the rest.
 
 | Suit | Effect |
@@ -47,7 +47,7 @@ The suit of **your last card that counted** against the floor's final enemy card
 Your deck has no size limit (`deck_cap` 0), and you may decline any reward card (`reward_optional`) to keep your deck lean. With a `deck_cap`, you must add cards until the deck is full; then swap a card out for the new one or decline. Your deck can never shrink below `deck_min` cards.
 
 ## The kings
-The last floor is the four kings, with `boss_hand_size` cards in hand. Beat all four to win.
+The last floor is the four kings, with `face_hand_size` cards in hand like the Jacks and Queens. Beat all four to win.
 
 ## Mods (mod ace)
 | Mod ace | Mod |
@@ -66,18 +66,20 @@ A test keeps these values in sync with `config/balance.json`.
 | `start_pick_offer` | 3 | Threes revealed at the start |
 | `start_pick_take` | 1 | Threes you keep |
 | `hand_size` | 4 | Hand size |
-| `boss_hand_size` | 3 | Hand size against the kings |
+| `face_hand_size` | 3 | Hand size on the Jack, Queen and King floors |
 | `keep_hand` | true | Unplayed cards stay in hand between rounds |
 | `retain` | 1 | Cards you may keep (only when `keep_hand` is off) |
 | `deck_cap` | 0 | Max cards in your deck (0 = no limit) |
 | `reward_optional` | true | You may always decline a reward card |
-| `deck_min` | 6 | Min cards in your deck (removing or burning) |
+| `deck_min` | 4 | Min cards in your deck (♣ removal) |
 | `lives` | 2 | Number of life aces |
 | `graded_threshold` | 4 | Miss that costs 2 lives |
 | `failed_attack_returns` | true | An attack you fail to block goes to the bottom of the enemy pile |
 | `club_pair_bonus` | 1 | Clubs bonus |
 | `overpower_multiplier` | 2 | Black value needed to overpower an attack (× its value) |
 | `overpower_draw` | 0 | Cards drawn on overpower |
-| `perfect_draw` | 0 | Extra cards next hand after a perfect hit |
+| `perfect_draw` | 1 | Extra cards next hand after a perfect hit |
 | `burn_mode` | double | Burned card: `double` its rank in its own colour, or `swap` to the other colour |
-| `burn_limit` | 1 | Cards you may burn per round (0 = no limit) |
+| `burn_limit` | 0 | Cards you may burn per round (0 = no limit) |
+| `burn_min_deck` | 5 | Cards your deck needs to burn one |
+| `burn_no_refill` | true | After a round you burned in, your hand is not refilled |

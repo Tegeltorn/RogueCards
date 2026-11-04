@@ -25,6 +25,15 @@ func test_every_floor_has_four_cards() -> void:
 		eq(e.state.enemy_pile.size() + e.state.current.size(), 4, "floor %d has 4 enemy cards" % f)
 
 
+func test_face_hand_size() -> void:
+	var e := scenario([], ["4S"])
+	e.state.deck = cards(e, ["2H", "2D", "2S", "2C", "5C"])
+	e._start_floor(10)
+	eq(e.state.hand.size(), 4, "floor 10: full hand")
+	e._start_floor(11)
+	eq(e.state.hand.size(), 3, "Jacks demand tribute: 3 cards")
+
+
 func test_boss_hand_size() -> void:
 	var e := scenario([], ["4S"])
 	e.state.deck = cards(e, ["2H", "2D", "2S", "2C", "5C"])

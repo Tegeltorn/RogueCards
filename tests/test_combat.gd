@@ -306,16 +306,33 @@ func test_burn_swap_counts_as_other_colour() -> void:
 
 
 func test_burn_limits() -> void:
-	var e := scenario(["2S", "3S", "4S"], ["9H"], {"burn_mode": "double", "burn_limit": 1, "deck_min": 4}, {"pile": ["5S"]})
+	var e := scenario(["2S", "3S", "4S"], ["9H"], {"burn_mode": "double", "burn_limit": 1, "burn_min_deck": 5}, {"pile": ["5S"]})
 	e.state.deck += cards(e, ["2C", "2D"])  # 5 cards
 	check(e.burn_card(e.state.hand[0].id), "first burn")
 	check(not e.burn_card(e.state.hand[0].id), "once per round")
-	var f := scenario(["2S", "3S"], ["9H"], {"burn_mode": "double", "burn_limit": 0, "deck_min": 4}, {"pile": ["5S"]})
-	f.state.deck += cards(f, ["2C", "2D"])  # 4 cards: at the minimum
-	check(not f.can_burn(), "the deck never shrinks below deck_min")
+	var f := scenario(["2S", "3S"], ["9H"], {"burn_mode": "double", "burn_limit": 0, "burn_min_deck": 5}, {"pile": ["5S"]})
+	f.state.deck += cards(f, ["2C", "2D"])  # 4 cards
+	check(not f.can_burn(), "needs burn_min_deck cards in the deck")
+	var u := scenario(["2S", "3S", "4S"], ["9H"], {"burn_mode": "double", "burn_limit": 0, "burn_min_deck": 5}, {"pile": ["5S"]})
+	u.state.deck += cards(u, ["2C", "2D", "2H"])  # 6 cards
+	check(u.burn_card(u.state.hand[0].id), "burn 1 (deck 6 -> 5)")
+	check(u.burn_card(u.state.hand[0].id), "burn 2 (deck 5 -> 4): no per-round limit")
+	check(not u.can_burn(), "deck 4: no more")
 	var g := scenario(["2S"], ["9H"], {"burn_mode": "off"}, {"pile": ["5S"]})
 	g.state.deck += cards(g, ["2C", "2D", "2H", "2S"])
 	check(not g.burn_card(g.state.hand[0].id), "burning off")
+
+
+func test_burn_skips_next_refill() -> void:
+	var e := scenario(["7H", "2S", "3S"], ["12S"], {"burn_mode": "double", "burn_no_refill": true, "hand_size": 4}, {"pile": ["5S", "6S"]})
+	e.state.deck += cards(e, ["2C", "2D", "2H", "2S"])
+	e.state.draw_pile = cards(e, ["9D", "9H", "8D"])
+	e.burn_card(e.state.hand[0].id)
+	e.resolve()
+	check(has_event(e, Ev.REFILL_SKIPPED), "refill skipped")
+	eq(e.state.hand.size(), 2, "only the two kept cards")
+	e.resolve()
+	eq(e.state.hand.size(), 4, "refilled again the round after")
 
 
 func test_burned_card_sets_the_reward() -> void:
