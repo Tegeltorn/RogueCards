@@ -554,6 +554,7 @@ func _do_resolve() -> bool:
 	var b := state.balance
 	var bneed: int = t["block_need"]
 	var aneed: int = t["attack_need"]
+	var report_store := false
 	if bneed > 0:
 		var blk: int = t["block"]
 		var new_carry := 0
@@ -582,8 +583,9 @@ func _do_resolve() -> bool:
 			_emit(Ev.SHIELD_STORED, {"amount": new_carry})
 	elif int(t["hearts"]) > 0:
 		# ♥ played with no attack to block: the whole heart value is stored (replaces older shield).
+		# Reported after the shield is settled: a blocked last stand uses the hearts and keeps only the rest.
 		state.carry_shield = int(t["hearts"])
-		_emit(Ev.SHIELD_STORED, {"amount": state.carry_shield})
+		report_store = true
 	elif b["heart_carry_mode"] == "next_round":
 		state.carry_shield = 0
 	if aneed > 0:
@@ -621,6 +623,8 @@ func _do_resolve() -> bool:
 				_emit(Ev.ATTACK_FAILED, {"attack": atk, "shield": aneed})
 				for e in shields:
 					state.enemy_pile.append(e)
+	if report_store and state.carry_shield > 0:
+		_emit(Ev.SHIELD_STORED, {"amount": state.carry_shield})
 	for c in state.played:
 		if not c.temp:
 			state.discard.append(c)
@@ -728,7 +732,7 @@ func _floor_cleared() -> void:
 	var last = state.last_used if state.last_used != null else state.last_beaten
 	_emit(Ev.FLOOR_CLEARED, {"floor": state.floor_num, "last": last.label() if last else "",
 		"suit": last.suit if last else "",
-		"enemy": state.last_beaten.label() if state.last_beaten else ""})
+		"enemy": state.last_beaten.label() if state.last_beaten else "", "by_player": state.last_used != null})
 	if state.is_boss():
 		state.result = "win"
 		state.phase = Phase.WON

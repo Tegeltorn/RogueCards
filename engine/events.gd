@@ -84,8 +84,15 @@ static func describe(e: Dictionary) -> String:
 		LIFE_LOST: return "Lost a life (%s), %d left" % [e.get("card", ""), e.get("lives", 0)]
 		LIFE_RESTORED: return "Life restored (%s), %d lives" % [e.get("card", ""), e.get("lives", 0)]
 		RETAINED: return "Kept %s" % ", ".join(e.get("cards", [])) if not e.get("cards", []).is_empty() else "Kept nothing"
-		FLOOR_CLEARED: return "Floor %s cleared, last card: %s" % [floor_name(e.get("floor", 0)), e.get("last", "")]
-		REWARD_OFFERED: return "Reward (%s): %s" % [SUIT_NAME.get(e.get("suit"), "?"), ", ".join(e.get("options", []))]
+		FLOOR_CLEARED:
+			if e.get("by_player", true):
+				return "Floor %s cleared, finished with %s" % [floor_name(e.get("floor", 0)), e.get("last", "")]
+			return "Floor %s cleared, no card of yours finished it: %s sets the reward" % [floor_name(e.get("floor", 0)), e.get("last", "")]
+		REWARD_OFFERED:
+			var rs: String = SUIT_NAME.get(e.get("suit"), "?")
+			if int(e.get("healed", 0)) > 0:
+				return "Reward (%s): a life back, no card" % rs
+			return "Reward (%s): %s" % [rs, ", ".join(e.get("options", []))]
 		REWARD_TAKEN:
 			if e.get("replaced", "") != "":
 				return "Took %s, swapped out %s" % [e.get("card", ""), e.get("replaced", "")]

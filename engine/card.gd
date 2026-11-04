@@ -44,6 +44,8 @@ func value() -> int:
 func label() -> String:
 	if suit == "J":
 		return "Joker"
+	if from_joker:
+		return "Joker %d%s" % [rank, SYMBOL.get(suit, suit)]
 	var r: String = RANK_NAME.get(rank, str(rank))
 	return r + SYMBOL.get(suit, suit)
 
