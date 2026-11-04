@@ -14,6 +14,46 @@ const JOKER_TEXT := {
 }
 
 
+## Everything a card does, without fight context (reward and start-pick screens).
+static func card_info(b: Dictionary, c) -> String:
+	var v: int = c.value()
+	var lines: Array = []
+	match c.suit:
+		"H":
+			lines.append("Block %d. Leftover block is stored as shield for the next round; with no attack to block, all %d is stored." % [v, v])
+		"D":
+			lines.append("Block %d and draw 1 card (also when played against a shield)." % v)
+		"S":
+			lines.append("Attack %d (%d × %s, rounded down)." % [int(floor(v * float(b["spade_multiplier"]))), v, str(b["spade_multiplier"])])
+		"C":
+			lines.append("Attack %d. +%d if you play 2 or more clubs in a round." % [v, int(b["club_pair_bonus"])])
+	if c.suit == "S" or c.suit == "C":
+		lines.append("Against an attack it doesn't block, but counts toward overpower (%d× the attack: discard, draw 1)." % int(b.get("overpower_multiplier", 2)))
+	if c.joker != "":
+		lines.append(JOKER_TEXT.get(c.joker, ""))
+	return "\n".join(lines)
+
+
+## A tooltip box (panel + label) for screens that list cards.
+static func tip_box() -> PanelContainer:
+	var p := PanelContainer.new()
+	p.add_theme_stylebox_override("panel", Style.box(Color(0.06, 0.04, 0.1, 0.96), Style.GOLD, 3, 12))
+	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var l := Style.label("", 22, Style.WHITE, HORIZONTAL_ALIGNMENT_LEFT)
+	l.name = "Text"
+	p.add_child(l)
+	p.visible = false
+	return p
+
+
+static func show_tip(p: PanelContainer, b: Dictionary, c) -> void:
+	if c == null:
+		p.visible = false
+		return
+	(p.get_node("Text") as Label).text = c.label() + ":  " + card_info(b, c)
+	p.visible = true
+
+
 ## One or two lines describing what a hand card does right now.
 static func card_effect(e, c) -> String:
 	var b: Dictionary = e.state.balance

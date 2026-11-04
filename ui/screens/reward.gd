@@ -3,6 +3,7 @@ extends Control
 
 const Style := preload("res://ui/style.gd")
 const CardView := preload("res://ui/card_view.gd")
+const Help := preload("res://ui/screens/help.gd")
 const GameState := preload("res://engine/game_state.gd")
 const Ev := preload("res://engine/events.gd")
 const Phase := GameState.Phase
@@ -31,6 +32,8 @@ var _opt_views: Dictionary = {}
 var _deck_views: Dictionary = {}
 var _fresh_id := -1  # card that just landed in the deck (gets a pop + glow after refresh)
 var _animating := false
+var _tip: PanelContainer
+var _last_tapped := -1  # card shown in the tooltip
 
 
 func enter() -> void:
@@ -64,6 +67,8 @@ func enter() -> void:
 	pad.add_theme_constant_override("margin_top", 40)
 	pad.add_child(_opts)
 	_v.add_child(pad)
+	_tip = Help.tip_box()
+	_v.add_child(_tip)
 	_confirm = Style.button("", Style.RED, 32)
 	_confirm.custom_minimum_size.y = 90
 	_confirm.pressed.connect(_on_confirm)
@@ -163,6 +168,10 @@ func _deck_pickable() -> bool:
 ## Highlights the selection (lifted + gold, like in a fight) and sets the confirm button.
 func _update_sel() -> void:
 	var s = _e.state
+	var tip_card = s.find_in(s.reward.get("options", []), _last_tapped)
+	if tip_card == null:
+		tip_card = s.find_in(s.deck, _last_tapped)
+	Help.show_tip(_tip, s.balance, tip_card)
 	for id in _opt_views:
 		var cv: CardView = _opt_views[id]
 		cv.set_selected(id == _opt_sel)
@@ -215,6 +224,7 @@ func _on_option(id: int) -> void:
 	if main.is_busy() or _animating:
 		return
 	_opt_sel = -1 if _opt_sel == id else id
+	_last_tapped = _opt_sel
 	main.sfx.play("select")
 	_update_sel()
 
@@ -223,6 +233,7 @@ func _on_deck(id: int) -> void:
 	if main.is_busy() or _animating or not _deck_pickable():
 		return
 	_deck_sel = -1 if _deck_sel == id else id
+	_last_tapped = _deck_sel if _deck_sel >= 0 else _opt_sel
 	main.sfx.play("select")
 	_update_sel()
 
