@@ -139,7 +139,7 @@ func refresh() -> void:
 		_deck_views[c.id] = cv
 		if c.id == _fresh_id:
 			cv.pop(0.2)
-			cv.highlight = Style.GREEN
+			cv.highlight = Style.COUNT
 			var tw := cv.create_tween()
 			tw.tween_interval(0.8)
 			tw.tween_callback(func():

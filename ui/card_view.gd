@@ -150,8 +150,13 @@ func _draw() -> void:
 	sh.shadow_offset = Vector2(2, 5 - lift * 0.12)
 	draw_style_box(sh, r)
 	if highlight.a > 0.0:
-		var g := Style.box(Color(highlight, highlight.a * 0.12), highlight, 3, rad + 5)
-		draw_style_box(g, r.grow(6))
+		# A clear ring: soft glow of the highlight colour, then a solid 4 px border just outside the card.
+		var glow := Style.box(Color(highlight, highlight.a * 0.22), Color(0, 0, 0, 0), 0, rad + 7)
+		glow.shadow_color = Color(highlight, highlight.a * 0.55)
+		glow.shadow_size = 12
+		glow.shadow_offset = Vector2.ZERO
+		draw_style_box(glow, r.grow(7))
+		draw_style_box(Style.box(Color(0, 0, 0, 0), highlight, 4, rad + 6), r.grow(6))
 	if not face_up:
 		_draw_back(r, a)
 	else:

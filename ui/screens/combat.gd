@@ -537,7 +537,7 @@ func _update_controls() -> void:
 		if retaining and _retain_sel.has(id):
 			cv.highlight = Style.GOLD
 		elif playing and _e.is_effective(c):
-			cv.highlight = Color(Style.GREEN, 0.85)  # counts against the current enemy
+			cv.highlight = Style.COUNT  # counts against the current enemy
 		else:
 			cv.highlight = Color(0, 0, 0, 0)
 	_main_btn.disabled = main.is_busy()
