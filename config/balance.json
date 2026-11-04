@@ -15,6 +15,7 @@
   "lives": 3,
   "short_floors": [4, 5],
   "graded_threshold": 4,
+  "failed_attack_returns": true,
   "spade_multiplier": 1.5,
   "club_pair_bonus": 1,
   "overpower_multiplier": 2,

@@ -10,9 +10,13 @@
 
 ## Graphics, shaders and sound
 Everything is made for this project:
-- Cards and suit symbols are drawn in code (`ui/card_view.gd`).
-- The shaders are in `ui/fx/`.
-- The sounds are synthesized at runtime (`ui/sfx.gd`).
+- Cards and suit symbols are drawn in code (`ui/card_view.gd`). The loading-screen image
+  (`assets/splash.png`) is rendered from that code by `tools/make_art.gd`.
+- App icons: `icon.png` (browser tab, no letters) and `assets/app_icon/` (installed web app and Android,
+  with "RC") are artwork supplied by the project owner for this game.
+- The shaders are in `ui/fx/`. The drifting smoke is a flow-noise shader (`ui/fx/smoke.gdshader`).
+- The sounds are synthesized at runtime (`ui/sfx.gd`): plucked strings (Karplus-Strong), wooden knocks,
+  parchment rustles, a frame drum and a hand bell.
 
 There are no third-party graphics or sounds. The style is inspired by medieval illuminated manuscripts and Pre-Raphaelite painting but uses no assets, names or fonts from any other game.
 

@@ -247,7 +247,7 @@ func _tappable(c: Control, fn: Callable) -> void:
 	c.mouse_filter = Control.MOUSE_FILTER_STOP
 	c.gui_input.connect(func(ev: InputEvent):
 		if ev is InputEventMouseButton and ev.button_index == MOUSE_BUTTON_LEFT and not ev.pressed and not main.is_busy():
-			main.sfx.play("select")
+			main.sfx.play("card")
 			fn.call())
 
 
@@ -537,7 +537,7 @@ func _update_controls() -> void:
 		if retaining and _retain_sel.has(id):
 			cv.highlight = Style.GOLD
 		elif playing and _e.is_effective(c):
-			cv.highlight = Color(Style.GREEN, 0.85)  # counts against the current enemy
+			cv.highlight = Style.COUNT  # counts against the current enemy
 		else:
 			cv.highlight = Color(0, 0, 0, 0)
 	_main_btn.disabled = main.is_busy()
@@ -632,6 +632,8 @@ func _update_total() -> void:
 		if miss > 0:
 			var lives := 2 if miss >= int(s.balance["graded_threshold"]) else 1
 			_need_label.text = "Miss by %d: -%d %s" % [miss, lives, "life" if lives == 1 else "lives"]
+			if bool(s.balance.get("failed_attack_returns", false)):
+				_need_label.text += ", and it comes back"
 		elif _e.lockout_risk():
 			_need_label.text = "Not enough: -1 life"
 		else:
@@ -728,7 +730,7 @@ func _on_card_tapped(cv: CardView) -> void:
 	if s.phase == Phase.PLAY:
 		# Tap inspects one card (tooltip + preview); drag it onto the enemy to play it.
 		_selected = [] if _selected.has(c.id) else [c.id]
-		main.sfx.play("select")
+		main.sfx.play("card")
 	elif s.phase == Phase.RETAIN:
 		if _retain_sel.has(c.id):
 			_retain_sel.erase(c.id)
@@ -736,7 +738,7 @@ func _on_card_tapped(cv: CardView) -> void:
 			if _retain_sel.size() >= _e.retain_limit():
 				_retain_sel.pop_front()
 			_retain_sel.append(c.id)
-		main.sfx.play("select")
+		main.sfx.play("card")
 	_update_controls()
 
 
@@ -751,6 +753,7 @@ func _on_drag_started(cv: CardView) -> void:
 	if main.is_busy() or _e.state.phase != Phase.PLAY:
 		return
 	_selected = [cv.card_id]
+	main.sfx.play("card", 0.9)
 	cv.z_index = 60
 	cv.set_selected(false)
 	_update_controls()
@@ -1002,6 +1005,17 @@ func play_event(ev: Dictionary) -> float:
 				main.toast("BREAK!", Style.GOLD, 600)
 			main.shake(8.0)
 			return 0.45
+		Ev.ATTACK_RETURNED:
+			# Not blocked: the attack card slides off to the bottom of the enemy pile.
+			if _enemy_views.has(ev["id"]):
+				var cv: CardView = _enemy_views[ev["id"]]
+				var tw := cv.create_tween()
+				tw.tween_property(cv, "position:y", cv.position.y - 30, 0.12).set_trans(Tween.TRANS_SINE)
+				tw.tween_property(cv, "position:y", cv.position.y + 500, 0.35).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN)
+				tw.parallel().tween_property(cv, "modulate:a", 0.0, 0.35)
+			main.toast("It comes back", Style.MUTED, 680, 40)
+			main.sfx.play("play", 0.85)
+			return 0.55
 		Ev.ATTACK_FAILED:
 			main.toast("The shield holds", Style.BLUE, 600, 48)
 			for id in _enemy_views:
@@ -1023,13 +1037,19 @@ func play_event(ev: Dictionary) -> float:
 			if _enemy_views.has(ev["id"]):
 				var cv: CardView = _enemy_views[ev["id"]]
 				var center := cv.get_global_rect().get_center()
-				main.burst(center, Style.suit_color(ev["suit"]) if ev["suit"] != "J" else Style.GOLD, 46)
 				main.burst(center, Style.GOLD, 16)
+				cv.breathing = false
+				cv.pop(0.1)
+				# Beaten: a crack runs across it and its colour drains away, then it fades off the table.
 				var tw := cv.create_tween()
-				tw.tween_property(cv, "scale", cv.scale * 1.2, 0.08)
-				tw.tween_property(cv, "scale", Vector2(0.01, 0.01), 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
+				tw.tween_property(cv, "crack", 1.0, 0.28).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+				tw.parallel().tween_property(cv, "grey", 1.0, 0.4)
+				tw.tween_interval(0.35)
+				tw.tween_property(cv, "modulate:a", 0.0, 0.3)
+				tw.parallel().tween_property(cv, "drop", Vector2(0, 24), 0.3).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+				main.sfx.play("crack", 1.15)
 			main.sfx.play("defeat")
-			return 0.35
+			return 0.75
 		Ev.RETAINED:
 			for id in _table_views.keys():
 				_table_views[id].queue_free()

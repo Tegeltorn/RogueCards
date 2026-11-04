@@ -49,7 +49,7 @@ func enter() -> void:
 
 	var play := Style.button("New run", Style.RED, 38)
 	play.custom_minimum_size.y = 96
-	play.pressed.connect(func(): main.sfx.play("select"); main.new_run())
+	play.pressed.connect(func(): main.new_run())
 	v.add_child(play)
 
 	var h := HBoxContainer.new()
@@ -71,12 +71,13 @@ func enter() -> void:
 	stats.pressed.connect(func(): main.open_stats())
 	v.add_child(stats)
 
-	var toggles := HBoxContainer.new()
-	toggles.alignment = BoxContainer.ALIGNMENT_CENTER
+	var toggles := HFlowContainer.new()
+	toggles.alignment = FlowContainer.ALIGNMENT_CENTER
+	toggles.add_theme_constant_override("h_separation", 10)
 	for key in ["night", "crt", "sound"]:
 		var cb := CheckBox.new()
 		cb.text = {"night": "Night", "crt": "Vignette", "sound": "Sound"}[key]
-		cb.button_pressed = bool(main.settings.get(key, key != "night"))
+		cb.button_pressed = bool(main.settings.get(key, key == "crt" or key == "sound"))
 		cb.focus_mode = Control.FOCUS_NONE
 		cb.toggled.connect(func(on):
 			main.settings[key] = on

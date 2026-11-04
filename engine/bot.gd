@@ -99,7 +99,9 @@ func _play_thrifty(e) -> void:
 	var need: int = e.block_need()
 	if need > 0:
 		var miss: int = need - int(e.compute(s.played)["block"])
-		if miss >= graded:
+		# A graded miss always warrants an ace; with returning attacks any miss does
+		# (an ace costs 1 life once, a miss costs a life and the attack comes back).
+		if miss >= graded or (miss > 0 and bool(s.balance.get("failed_attack_returns", false))):
 			for a in e.sacrificable_aces():
 				if a.base_red() or not s.balance["ace_sac_own_color"]:
 					e.sacrifice_ace(a.id)
@@ -165,7 +167,7 @@ func _play_all(e) -> void:
 	if need > 0:
 		var t: Dictionary = e.compute(e.state.played)
 		var miss: int = need - int(t["block"])
-		if miss >= int(e.state.balance["graded_threshold"]):
+		if miss >= int(e.state.balance["graded_threshold"]) or (miss > 0 and bool(e.state.balance.get("failed_attack_returns", false))):
 			for a in e.sacrificable_aces():
 				if a.base_red() or not e.state.balance["ace_sac_own_color"]:
 					e.sacrifice_ace(a.id)

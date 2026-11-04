@@ -242,3 +242,22 @@ func test_min_draw_and_free_discard() -> void:
 	eq(e.state.hand.size(), 3, "6♠ kept + drew 2 (fill to 3, min 1)")
 	var f := scenario(["2H"], ["3S"], {"free_discard": false})
 	check(not f.discard_card(f.state.hand[0].id), "discard off by default")
+
+
+func test_failed_block_attack_returns() -> void:
+	var e := scenario(["2H"], ["9S"], {"failed_attack_returns": true}, {"pile": ["5S", "6H"]})
+	e.play_cards([e.state.hand[0].id])
+	e.resolve()
+	check(has_event(e, Ev.DAMAGE_TAKEN), "damage taken")
+	check(has_event(e, Ev.ATTACK_RETURNED), "attack returned")
+	check(not has_event(e, Ev.ENEMY_DEFEATED), "not beaten")
+	eq(e.state.enemy_pile[-1].label(), "9♠", "failed attack goes to the bottom")
+	eq(e.state.lives.size(), 1, "miss of 7 costs 2 lives")
+
+
+func test_failed_block_beaten_when_rule_off() -> void:
+	var e := scenario(["2H"], ["9S"], {"failed_attack_returns": false}, {"pile": ["5S", "6H"]})
+	e.play_cards([e.state.hand[0].id])
+	e.resolve()
+	check(not has_event(e, Ev.ATTACK_RETURNED), "no return")
+	check(has_event(e, Ev.ENEMY_DEFEATED), "beaten either way")

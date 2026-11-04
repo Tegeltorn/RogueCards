@@ -112,7 +112,7 @@ func _on_pick(id: int) -> void:
 		if _pick_ids.size() >= picks:
 			_pick_ids.pop_front()
 		_pick_ids.append(id)
-	main.sfx.play("select")
+	main.sfx.play("card")
 	_update_pick()
 
 

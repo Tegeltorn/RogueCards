@@ -14,7 +14,8 @@ static var RED: Color     # red suits, danger, primary buttons
 static var BLACK: Color   # black suits, secondary buttons
 static var GOLD: Color    # highlights, headings
 static var BLUE: Color    # shields and info (a blue-free verdigris)
-static var GREEN: Color   # "this counts" and confirmations
+static var GREEN: Color   # confirmations, main action button
+static var COUNT: Color   # highlight on cards that count against the enemy (brighter leaf green)
 static var PLUM: Color    # sacrifices, debug and other rare actions
 static var STEEL: Color   # sword blade
 static var PANEL: Color   # overlay panels
@@ -49,6 +50,7 @@ static func set_night(on: bool) -> void:
 		GOLD = Color("9c6b1c")
 		BLUE = Color("3f6b5f")
 		GREEN = Color("4d6b2f")
+		COUNT = Color("3f9a2a")
 		PLUM = Color("6e3550")
 		STEEL = Color("8a8173")
 		PANEL = Color("f4ead2")
@@ -65,6 +67,7 @@ static func set_night(on: bool) -> void:
 		GOLD = Color("c99a4a")
 		BLUE = Color("7f9c84")
 		GREEN = Color("8a9f55")
+		COUNT = Color("9fd45a")
 		PLUM = Color("8a4a66")
 		STEEL = Color("b8ab95")
 		PANEL = Color("2a1f18")

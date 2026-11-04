@@ -9,6 +9,7 @@ const Ev := preload("res://engine/events.gd")
 const Style := preload("res://ui/style.gd")
 const Store := preload("res://ui/store.gd")
 const Sfx := preload("res://ui/sfx.gd")
+const Smoke := preload("res://ui/fx/smoke.gd")
 const Phase := GameState.Phase
 
 const SCREENS := {
@@ -30,6 +31,7 @@ var screen: Control
 var screen_name := ""
 
 var _bg: ColorRect
+var _smoke: Smoke
 var _shake_root: Control
 var _holder: Control
 var _overlay: Control
@@ -51,6 +53,9 @@ func _ready() -> void:
 	_bg.material = bgm
 	_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(Style.full(_bg))
+	# Smoke drifts over the page, behind the cards and text.
+	_smoke = Smoke.new()
+	add_child(Style.full(_smoke))
 	_shake_root = Style.full(Control.new())
 	_shake_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_shake_root)
@@ -76,6 +81,8 @@ func _ready() -> void:
 	_crt.z_index = 110
 	sfx = Sfx.new()
 	add_child(sfx)
+	# Every button and toggle plucks the harp when pressed (cards use paper sounds instead).
+	get_tree().node_added.connect(_on_node_added)
 	apply_settings()
 	show_screen("menu")
 
@@ -110,6 +117,10 @@ func _apply_palette() -> void:
 	var crtm: ShaderMaterial = _crt.material
 	crtm.set_shader_parameter("tint", Color(0, 0, 0) if Style.night else Color(0.25, 0.14, 0.06))
 	crtm.set_shader_parameter("vignette", 0.4 if Style.night else 0.22)
+	if Style.night:
+		_smoke.set_colors(Color("eee6da"), Color(0, 0, 0), 0.2)
+	else:
+		_smoke.set_colors(Color("fffaf0"), Color("6b4a2e"), 0.55)
 	if changed and screen != null:
 		# Screens bake colours in when built, so rebuild the visible one.
 		var n := screen_name
@@ -117,6 +128,11 @@ func _apply_palette() -> void:
 		show_screen(n)
 		if screen.has_method("refresh"):
 			screen.refresh()
+
+
+func _on_node_added(n: Node) -> void:
+	if n is BaseButton:
+		(n as BaseButton).pressed.connect(func(): sfx.play("select"))
 
 
 # ---------------------------------------------------------------- run control

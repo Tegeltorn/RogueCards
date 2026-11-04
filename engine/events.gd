@@ -21,6 +21,7 @@ const DAMAGE_TAKEN := "damage_taken"
 const SHIELD_STORED := "shield_stored"
 const ATTACK_SUCCEEDED := "attack_succeeded"
 const ATTACK_FAILED := "attack_failed"
+const ATTACK_RETURNED := "attack_returned"
 const LOCKOUT := "lockout"
 const ENEMY_DEFEATED := "enemy_defeated"
 const LIFE_LOST := "life_lost"
@@ -72,6 +73,7 @@ static func describe(e: Dictionary) -> String:
 		DAMAGE_TAKEN: return "Missed by %d: -%d lives" % [e.get("miss", 0), e.get("lives", 0)]
 		SHIELD_STORED: return "Stored shield: %d" % e.get("amount", 0)
 		ATTACK_SUCCEEDED: return "Attack %d vs shield %d: broken" % [e.get("attack", 0), e.get("shield", 0)]
+		ATTACK_RETURNED: return "%s was not blocked: it goes to the bottom and comes back" % e.get("card", "")
 		ATTACK_FAILED: return "Attack %d vs shield %d: goes to the bottom" % [e.get("attack", 0), e.get("shield", 0)]
 		LOCKOUT: return "Last stand! The shield held with no attackers left: -1 life, the shield counts as beaten"
 		ENEMY_DEFEATED: return "Defeated %s" % e.get("card", "")

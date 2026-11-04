@@ -144,7 +144,7 @@ func refresh() -> void:
 		_deck_views[c.id] = cv
 		if c.id == _fresh_id:
 			cv.pop(0.2)
-			cv.highlight = Style.GREEN
+			cv.highlight = Style.COUNT
 			var tw := cv.create_tween()
 			tw.tween_interval(0.8)
 			tw.tween_callback(func():
@@ -225,7 +225,7 @@ func _on_option(id: int) -> void:
 		return
 	_opt_sel = -1 if _opt_sel == id else id
 	_last_tapped = _opt_sel
-	main.sfx.play("select")
+	main.sfx.play("card")
 	_update_sel()
 
 
@@ -234,7 +234,7 @@ func _on_deck(id: int) -> void:
 		return
 	_deck_sel = -1 if _deck_sel == id else id
 	_last_tapped = _deck_sel if _deck_sel >= 0 else _opt_sel
-	main.sfx.play("select")
+	main.sfx.play("card")
 	_update_sel()
 
 

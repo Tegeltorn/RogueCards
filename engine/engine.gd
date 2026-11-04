@@ -529,8 +529,15 @@ func resolve() -> bool:
 			_emit(Ev.DAMAGE_TAKEN, {"block": blk, "attack": bneed, "miss": miss, "lives": dmg})
 			if _lose_lives(dmg, "damage"):
 				return true
+		# An attack you failed to block goes to the bottom of the enemy pile and comes back
+		# (when failed_attack_returns is on); a blocked one is beaten.
+		var returns := blk < bneed and bool(b.get("failed_attack_returns", false)) and mod.failed_attacks_return()
 		for e in state.enemy_attack_cards():
-			_beat(e)
+			if returns:
+				state.enemy_pile.append(e)
+				_emit(Ev.ATTACK_RETURNED, {"id": e.id, "card": e.label()})
+			else:
+				_beat(e)
 		state.carry_shield = new_carry
 		if new_carry > 0:
 			_emit(Ev.SHIELD_STORED, {"amount": new_carry})

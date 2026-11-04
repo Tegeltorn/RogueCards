@@ -20,7 +20,17 @@ var dimmed := false
 var highlight := Color(0, 0, 0, 0)  # glow colour (alpha 0 = none)
 var breathing := true
 var interactive := true
-var crack := 0.0  # 0..1, cracked-ace effect
+var crack := 0.0  # 0..1: a crack grows across the card (broken ace, beaten enemy)
+## 0..1: fades the card to a dull warm grey (beaten enemy).
+var grey := 0.0:
+	set(v):
+		grey = v
+		if v > 0.0 and material == null:
+			var m := ShaderMaterial.new()
+			m.shader = preload("res://ui/fx/desaturate.gdshader")
+			material = m
+		if material != null:
+			(material as ShaderMaterial).set_shader_parameter("amount", v)
 var draggable := false
 var dragging := false
 const DRAG_START := 18.0
@@ -150,8 +160,13 @@ func _draw() -> void:
 	sh.shadow_offset = Vector2(2, 5 - lift * 0.12)
 	draw_style_box(sh, r)
 	if highlight.a > 0.0:
-		var g := Style.box(Color(highlight, highlight.a * 0.12), highlight, 3, rad + 5)
-		draw_style_box(g, r.grow(6))
+		# A clear ring: soft glow of the highlight colour, then a solid 4 px border just outside the card.
+		var glow := Style.box(Color(highlight, highlight.a * 0.22), Color(0, 0, 0, 0), 0, rad + 7)
+		glow.shadow_color = Color(highlight, highlight.a * 0.55)
+		glow.shadow_size = 12
+		glow.shadow_offset = Vector2.ZERO
+		draw_style_box(glow, r.grow(7))
+		draw_style_box(Style.box(Color(0, 0, 0, 0), highlight, 4, rad + 6), r.grow(6))
 	if not face_up:
 		_draw_back(r, a)
 	else:
@@ -263,13 +278,47 @@ func _draw_face(r: Rect2, a: float) -> void:
 		draw_string(Style.font(), band.position + Vector2(0, 20), "★ " + JOKER_TAG.get(joker, joker), HORIZONTAL_ALIGNMENT_CENTER, band.size.x, 19, Color(Style.ON_DARK if Style.is_dark(Style.GOLD) else Style.INK, a))
 
 
+## A jagged crack from the left edge to the right edge, with two branches. It grows along its
+## length as `crack` goes 0 -> 1, thickest in the middle and tapering to hairlines at the ends.
+## A pale line just below the dark one reads as the split edge of the paper.
+const CRACK_MAIN := [Vector2(-0.47, -0.3), Vector2(-0.3, -0.23), Vector2(-0.17, -0.07), Vector2(-0.03, -0.11),
+	Vector2(0.07, 0.07), Vector2(0.21, 0.13), Vector2(0.29, 0.3), Vector2(0.47, 0.37)]
+const CRACK_BRANCHES := [[2, Vector2(-0.1, 0.1), Vector2(-0.2, 0.22)], [4, Vector2(0.19, -0.04), Vector2(0.31, -0.16)]]
+
+
 func _draw_crack(r: Rect2) -> void:
-	var c := Color(Style.INK, crack * 0.8)
-	var pts := [Vector2(-0.1, -0.5), Vector2(0.05, -0.2), Vector2(-0.12, 0.05), Vector2(0.1, 0.25), Vector2(-0.02, 0.5)]
-	for i in pts.size() - 1:
-		draw_line(pts[i] * r.size, pts[i + 1] * r.size, c, 3, true)
-	draw_line(Vector2(0.05, -0.2) * r.size, Vector2(0.4, -0.3) * r.size, c, 2, true)
-	draw_line(Vector2(-0.12, 0.05) * r.size, Vector2(-0.45, 0.15) * r.size, c, 2, true)
+	var w := maxf(1.0, size.x * 0.011)
+	var dark := Color(Style.INK, 0.9 * minf(1.0, crack * 3.0))
+	var light := Color(Style.PAPER.lightened(0.6), 0.85 * minf(1.0, crack * 3.0))
+	var n := CRACK_MAIN.size() - 1
+	var grown := crack * n
+	for i in n:
+		var t := clampf(grown - i, 0.0, 1.0)
+		if t <= 0.0:
+			break
+		var a: Vector2 = (CRACK_MAIN[i] as Vector2) * r.size
+		var b: Vector2 = (CRACK_MAIN[i + 1] as Vector2) * r.size
+		b = a.lerp(b, t)
+		var taper := 0.35 + 0.65 * sin(PI * (i + 0.5) / n)
+		_crack_seg(a, b, w * taper, dark, light)
+	for br in CRACK_BRANCHES:
+		var from: int = br[0]
+		var t := clampf(grown - from, 0.0, 1.0)
+		if t <= 0.0:
+			continue
+		var p0: Vector2 = (CRACK_MAIN[from] as Vector2) * r.size
+		var p1: Vector2 = (br[1] as Vector2) * r.size
+		var p2: Vector2 = (br[2] as Vector2) * r.size
+		_crack_seg(p0, p0.lerp(p1, minf(1.0, t * 2.0)), w * 0.6, dark, light)
+		if t > 0.5:
+			_crack_seg(p1, p1.lerp(p2, (t - 0.5) * 2.0), w * 0.35, dark, light)
+
+
+func _crack_seg(a: Vector2, b: Vector2, w: float, dark: Color, light: Color) -> void:
+	var off := Vector2(0.8, 1.2) * maxf(1.0, w * 0.7)
+	draw_line(a + off, b + off, light, w, true)
+	draw_line(a, b, dark, w, true)
+	draw_circle(b, w * 0.5, dark, true, -1.0, true)  # rounds the joints
 
 
 ## Vector suit shapes so no glyphs are needed.

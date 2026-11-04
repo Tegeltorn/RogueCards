@@ -120,7 +120,8 @@ func test_rich_reveals_more() -> void:
 	e.start_run(5, Balance.make({}), {"force_mod": "D"})
 	eq(e.state.setup_picks, 1, "Rich keeps one three like everyone")
 	eq(int(e.reward_rules("C")["reveal"]), 3, "♣ reward reveals 3")
-	eq(int(e.reward_rules("D")["picks"]), 2, "♦ reward still takes 2")
+	eq(int(e.reward_rules("D")["picks"]), 3, "♦ reward takes all 3 revealed cards")
+	eq(int(e.reward_rules("D")["reveal"]), 3, "♦ reward reveals 3")
 
 
 func test_spec_preset_starts_on_three() -> void:
@@ -172,3 +173,13 @@ func test_bot_runs_finish() -> void:
 		e.start_run(sd, Balance.make({}), {})
 		Bot.new().play_run(e)
 		check(e.state.result == "win" or e.state.result == "dead", "seed %d result %s" % [sd, e.state.result])
+
+
+func test_hardened_failed_attack_is_beaten() -> void:
+	var e := scenario(["2H"], ["9S"], {"mods_enabled": true, "failed_attack_returns": true}, {"pile": ["5S", "6H"], "force_mod": "H"})
+	eq(e.mod.id, "hardened", "hardened mod")
+	e.play_cards([e.state.hand[0].id])
+	e.resolve()
+	check(has_event(e, Ev.DAMAGE_TAKEN), "damage taken")
+	check(not has_event(e, Ev.ATTACK_RETURNED), "no return under Hardened")
+	check(has_event(e, Ev.ENEMY_DEFEATED), "beaten anyway")
