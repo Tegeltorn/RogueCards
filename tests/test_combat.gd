@@ -182,3 +182,23 @@ func test_lockout_risk() -> void:
 	check(e.lockout_risk(), "shield with only red cards left")
 	var f := scenario(["2S"], ["9H"], {}, {"pile": ["6S"]})
 	check(not f.lockout_risk(), "a black card is still in the pile")
+
+
+func test_overpower_discards_and_draws() -> void:
+	var e := scenario(["7S", "3H"], ["5S"], {}, {"pile": ["9S"]})
+	e.state.draw_pile = cards(e, ["6D"])
+	e.play_cards([e.state.hand[0].id])  # 7♠ = 10 attack >= 2 × 5
+	check(has_event(e, Ev.OVERPOWER), "overpower")
+	eq(e.state.played.size(), 0, "black cards left the table")
+	eq(e.state.discard.size(), 1, "discarded")
+	eq(e.state.hand.size(), 2, "drew 1 (3♥ + 6♦)")
+	eq(e.state.current.size(), 1, "the enemy is still there")
+	e.resolve()
+	eq(e.state.lives.size(), 1, "it still attacks at End turn: miss 5 costs 2 lives")
+
+
+func test_no_overpower_below_double() -> void:
+	var e := scenario(["5S"], ["5S"], {}, {"pile": ["9S"]})
+	e.play_cards([e.state.hand[0].id])  # 7 < 10
+	check(not has_event(e, Ev.OVERPOWER), "not enough")
+	eq(e.state.played.size(), 1, "card stays on the table")

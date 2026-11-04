@@ -13,6 +13,8 @@
   "graded_threshold": 5,
   "spade_multiplier": 1.5,
   "club_pair_bonus": 2,
+  "overpower_multiplier": 2,
+  "overpower_draw": 1,
   "ace_value": 14,
   "ace_sac_enabled": true,
   "ace_sac_own_color": true,

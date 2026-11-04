@@ -86,6 +86,8 @@ var _tooltip_label: Label
 var _lives_caption: Label
 var _showdown: PanelContainer
 var _showdown_label: RichTextLabel
+var _finish_tip: PanelContainer
+var _finish_label: RichTextLabel
 var _mods_caption: Label
 var _draw_btn: Button
 var _disc_btn: Button
@@ -180,6 +182,19 @@ func _build() -> void:
 	_showdown.visible = false
 	_showdown.z_index = 20
 	add_child(_showdown)
+	_finish_tip = PanelContainer.new()
+	_finish_tip.add_theme_stylebox_override("panel", Style.box(Color(0.06, 0.04, 0.1, 0.9), Color(Style.GOLD, 0.7), 3, 10))
+	_finish_tip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_finish_label = RichTextLabel.new()
+	_finish_label.bbcode_enabled = true
+	_finish_label.fit_content = true
+	_finish_label.scroll_active = false
+	_finish_label.autowrap_mode = TextServer.AUTOWRAP_OFF
+	_finish_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_finish_label.add_theme_font_size_override("normal_font_size", 20)
+	_finish_tip.add_child(_finish_label)
+	_finish_tip.visible = false
+	add_child(_finish_tip)
 	_need_label = Style.label("", 24, Style.MUTED)
 	add_child(_need_label)
 	_carry_label = Style.label("", 22, Style.BLUE)
@@ -260,6 +275,7 @@ func _layout() -> void:
 	_total_label.size = Vector2(W, 80)
 	_total_label.pivot_offset = Vector2(W / 2, 40)
 	_showdown.position = Vector2(W / 2 - 230, ey + ENEMY_CARD.y - 96)
+	_finish_tip.position = Vector2(12, ey + 20)
 	_showdown.size = Vector2(460, 0)
 	_need_label.position = Vector2(0, ty + 72)
 	_need_label.size = Vector2(W, 30)
@@ -598,6 +614,19 @@ func _update_total() -> void:
 			_need_label.text = "Not enough: -1 life"
 		else:
 			_need_label.text = "The shield holds"
+	_need_label.add_theme_color_override("font_color", Style.MUTED)
+	var sel_cards: Array = []
+	for id in _selected:
+		var sc = s.find_in(s.hand, id)
+		if sc != null:
+			sel_cards.append(sc)
+	var has_black: bool = sel_cards.any(func(c): return c.is_black() and not c.is_red())
+	if has_black and int(t["block_need"]) > 0 and int(t["attack_need"]) == 0:
+		if _e.overpower_value(sel_cards) > 0:
+			_need_label.text = "OVERPOWER! Play: discard them, draw 1"
+			_need_label.add_theme_color_override("font_color", Style.GOLD)
+		else:
+			_need_label.text += "  ·  black %d/%d for overpower" % [_black_value(sel_cards), int(s.balance.get("overpower_multiplier", 2)) * int(t["block_need"])]
 	if int(t["block_need"]) == 0 and int(t["hearts"]) > 0:
 		_need_label.text += "  ·  ♥ stores %d shield" % int(t["hearts"])
 	if total != _last_total:
@@ -617,7 +646,40 @@ const SHOWDOWN_FLAVOUR := [
 
 
 ## Red ribbon over the enemy when failing this shield would cost a life (no black enemy cards left).
+func _black_value(cards: Array) -> int:
+	var t: Dictionary = _e.compute(cards.filter(func(c): return c.is_black() and not c.is_red()))
+	return int(t["attack"])
+
+
+## Small tip left of the enemy on a floor's last card: what each suit gives when you finish on it.
+func _update_finish_tip() -> void:
+	var s = _e.state
+	var show: bool = s.phase == Phase.PLAY and not s.is_boss() and s.enemy_pile.is_empty() and s.current.size() == 1
+	_finish_tip.visible = show
+	if not show:
+		return
+	var cur: String = s.current[0].suit
+	var lines: Array = ["[color=#f4b942]FINISH ON[/color]"]
+	for suit in ["S", "C", "H", "D"]:
+		var r: Dictionary = _e.reward_rules(suit)
+		var txt := ""
+		match suit:
+			"S": txt = "pick any"
+			"C": txt = "take 1 of %d, cut 1" % int(r["reveal"])
+			"H":
+				var h := int(r["heal"])
+				txt = "+%d %s" % [h, "life" if h == 1 else "lives"]
+			"D": txt = "take %d of %d" % [int(r["picks"]), int(r["reveal"])] if int(r["picks"]) < int(r["reveal"]) else "take %d" % int(r["picks"])
+		var col := "#e0383e" if suit == "H" or suit == "D" else "#fffaf0"
+		var line := "[color=%s]%s[/color] %s" % [col, Style.SUIT_SYM[suit], txt]
+		if suit == cur:
+			line = "[color=#2ec27e]> [/color]" + line
+		lines.append(line)
+	_finish_label.text = "\n".join(lines)
+
+
 func _update_showdown() -> void:
+	_update_finish_tip()
 	var s = _e.state
 	var risk: bool = s.phase == Phase.PLAY and _e.lockout_risk()
 	if not risk:
@@ -778,6 +840,21 @@ func play_event(ev: Dictionary) -> float:
 				_add_hand_card(c, 0.0)
 			main.sfx.play("draw")
 			return 0.2
+		Ev.OVERPOWER:
+			main.toast("OVERPOWER!", Style.GOLD, 600)
+			main.shake(10.0)
+			main.sfx.play("exact", 0.8)
+			var dest: Vector2 = _disc_btn.get_global_rect().get_center()
+			for id in ev["ids"]:
+				if _table_views.has(id):
+					var cv: CardView = _table_views[id]
+					_table_views.erase(id)
+					var tw := cv.create_tween()
+					tw.tween_property(cv, "global_position", dest - cv.size / 2, 0.35).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN)
+					tw.parallel().tween_property(cv, "scale", Vector2(0.4, 0.4), 0.35)
+					tw.tween_callback(cv.queue_free)
+			_layout_table()
+			return 0.5
 		Ev.CARDS_PLAYED:
 			for id in ev["ids"]:
 				if _hand_views.has(id):

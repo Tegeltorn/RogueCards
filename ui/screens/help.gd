@@ -38,7 +38,7 @@ static func card_effect(e, c) -> String:
 		elif c.suit == "D":
 			lines.append("No attack to block: it only draws a card.")
 		elif bneed > 0 and aneed == 0:
-			lines.append("No shield to break: no effect, it is just discarded.")
+			lines.append("No shield to break. Black cards worth %d× the attack overpower: discarded, draw 1." % int(b.get("overpower_multiplier", 2)))
 	return "\n".join(lines)
 
 
@@ -83,6 +83,7 @@ static func rules_overlay(main) -> Control:
 Tip: select a single card to see what it does.
 
 %s  If your block is too low you lose a life (a miss of %d or more costs 2). The attack card is beaten either way.
+%s  Play black cards worth %d× an attack: they are discarded and you draw 1 card. The enemy still attacks at End turn.
 %s  Break it with enough attack, or it goes to the bottom of the enemy pile and comes back.
 %s  Your aces at the bottom. Tap them to see them, or to sacrifice one: you lose that life and it counts as %d this round.
 %s  Keep up to %d unplayed card(s) for the next round.
@@ -93,6 +94,7 @@ Tip: select a single card to see what it does.
 		H % "EACH ROUND", int(b["hand_size"]),
 		H % "SUITS", str(b["spade_multiplier"]), int(b["club_pair_bonus"]),
 		H % "ATTACK", int(b["graded_threshold"]),
+		H % "OVERPOWER", int(b.get("overpower_multiplier", 2)),
 		H % "SHIELD",
 		H % "LIVES", int(b["ace_value"]),
 		H % "KEEP", int(b["retain"]),

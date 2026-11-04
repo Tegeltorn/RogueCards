@@ -19,7 +19,7 @@ Each round:
    - **Attack:** if your block is enough you are safe, otherwise you take damage. The enemy card is beaten either way.
    - **Shield:** if your attack is enough the shield is beaten. Otherwise it goes to the bottom of the enemy pile.
    - **Last stand:** if you fail against a shield and there are no black cards left in the enemy pile, lose 1 life and the shield counts as beaten.
-4. **Keep** up to `retain` unplayed cards. The rest of your hand and every played card go to the discard pile.
+4. **End your turn:** the revealed enemy card is resolved as above. Then **keep** up to `retain` unplayed cards. The rest of your hand and every played card go to the discard pile.
 
 | Suit | Effect |
 |---|---|
@@ -28,7 +28,7 @@ Each round:
 | ♠ | Attack. Value × 1.5, rounded down (2→3, 3→4, 5→7 …). |
 | ♣ | Attack. +`club_pair_bonus` if you play at least two clubs in the same round. |
 
-Black cards played against an attack do nothing; they are just discarded.
+Black cards played against an attack don't block. **Overpower:** if the black cards you play at once against an attack are worth at least `overpower_multiplier` × its value (♠ × 1.5 and the ♣ bonus count), discard them right away and draw `overpower_draw` card. The enemy still attacks when you end your turn.
 
 **Damage:** a miss of 1 to `graded_threshold` − 1 costs 1 life. A bigger miss costs 2 lives. Put lost aces aside. When you have no aces left, you lose.
 
@@ -81,3 +81,5 @@ A test keeps these values in sync with `config/balance.json`.
 | `short_floors` | [4,5] | Floors with only 3 enemies |
 | `graded_threshold` | 5 | Miss that costs 2 lives |
 | `club_pair_bonus` | 2 | Clubs bonus |
+| `overpower_multiplier` | 2 | Black value needed to overpower an attack (× its value) |
+| `overpower_draw` | 1 | Cards drawn on overpower |

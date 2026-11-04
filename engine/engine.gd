@@ -381,6 +381,38 @@ func compute(cards: Array) -> Dictionary:
 		"hearts": hearts, "carry": carry, "block_cards": reds, "attack_cards": blacks}
 
 
+## Attack value of the black cards among `cards` if they overpower the revealed attack, else 0.
+func overpower_value(cards: Array) -> int:
+	var mult := int(state.balance.get("overpower_multiplier", 2))
+	if mult <= 0 or block_need() <= 0 or attack_need() > 0:
+		return 0
+	var blacks: Array = cards.filter(func(c): return c.is_black() and not c.is_red())
+	if blacks.is_empty():
+		return 0
+	var atk := 0
+	var clubs := 0
+	for c in blacks:
+		atk += _attack_val(c)
+		if c.suit == "C":
+			clubs += 1
+	if clubs >= 2:
+		atk += int(state.balance["club_pair_bonus"])
+	atk = mod.modify_player_attack(atk)
+	return atk if atk >= mult * block_need() else 0
+
+
+## Reward rules for finishing a floor on `suit` (with the mod applied), for the "last card" tip.
+func reward_rules(suit: String) -> Dictionary:
+	var r := {"suit": suit, "heal": 0, "picks": 1, "reveal": 2, "remove": false, "all": false}
+	match suit:
+		"S": r["all"] = true
+		"C": r["remove"] = true
+		"H": r["heal"] = 1
+		"D": r["picks"] = 2
+	mod.modify_reward(r)
+	return r
+
+
 ## Live preview: already played cards plus the given hand card ids.
 func preview(selected_ids: Array) -> Dictionary:
 	var cards := state.played.duplicate()
@@ -410,6 +442,17 @@ func play_cards(ids: Array) -> bool:
 		state.played.append(c)
 	_emit(Ev.CARDS_PLAYED, {"cards": _labels(cards), "ids": _ids(cards)})
 	var draws := 0
+	# Overpower: black cards worth at least `overpower_multiplier` × the enemy attack (with no shield
+	# revealed) are discarded at once and you draw 1 card. The enemy still attacks at End turn.
+	var ov := overpower_value(cards)
+	if ov > 0:
+		var blacks: Array = cards.filter(func(c): return c.is_black() and not c.is_red())
+		for c in blacks:
+			state.played.erase(c)
+			if not c.temp:
+				state.discard.append(c)
+		draws += int(state.balance.get("overpower_draw", 1))
+		_emit(Ev.OVERPOWER, {"attack": ov, "enemy": block_need(), "ids": _ids(blacks), "cards": _labels(blacks)})
 	for c in cards:
 		if c.suit == "D":
 			draws += 1
@@ -566,13 +609,7 @@ func _floor_cleared() -> void:
 			pool.append(_new_card(c.rank, c.suit))
 	rng.shuffle(pool)
 	var suit: String = last.suit if last and Card.SUITS.has(last.suit) else "S"
-	var r := {"suit": suit, "heal": 0, "picks": 1, "reveal": 2, "remove": false, "all": false}
-	match suit:
-		"S": r["all"] = true
-		"C": r["remove"] = true
-		"H": r["heal"] = 1
-		"D": r["picks"] = 2
-	mod.modify_reward(r)
+	var r := reward_rules(suit)
 	if suit == "H" and state.lost_lives.is_empty():
 		r["heal"] = 0
 	var healed := 0
