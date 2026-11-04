@@ -50,6 +50,12 @@ func can_ace_sac() -> bool:
 	return true
 
 
+## False if attacks you fail to block are beaten anyway under this mod
+## (overrides the failed_attack_returns balance switch).
+func failed_attacks_return() -> bool:
+	return bool(params.get("failed_attacks_return", true))
+
+
 ## How many upcoming enemy cards the player can see.
 func preview_count() -> int:
 	return 0

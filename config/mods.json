@@ -2,18 +2,20 @@
   "H": {
     "id": "hardened",
     "name": "Hardened",
-    "desc": "Your mod ace is a 4th life, but ace sacrifice is disabled.",
+    "desc": "Your mod ace is a 4th life, but ace sacrifice is disabled. Attacks you fail to block are beaten anyway.",
     "params": {
       "heart_heal": 1,
-      "mod_ace_is_life": true
+      "mod_ace_is_life": true,
+      "failed_attacks_return": false
     }
   },
   "D": {
     "id": "rich",
     "name": "Rich",
-    "desc": "Every reward reveals 1 more card.",
+    "desc": "Every reward reveals 1 more card, and a ♦ reward lets you take all of them.",
     "params": {
-      "reveal_bonus": 1
+      "reveal_bonus": 1,
+      "diamond_picks": 3
     }
   },
   "S": {

@@ -59,8 +59,8 @@ Beat the whole boss pile to win.
 ## Mods (mod ace)
 | Mod ace | Mod |
 |---|---|
-| ♥ Hardened | Your mod ace is a 4th life, but ace sacrifice is disabled. |
-| ♦ Rich | Every reward reveals 1 more card. |
+| ♥ Hardened | Your mod ace is a 4th life, but ace sacrifice is disabled. Attacks you fail to block are beaten anyway. |
+| ♦ Rich | Every reward reveals 1 more card, and a ♦ reward lets you take all of them. |
 | ♠ Bloodthirst | Your attack gets +4, but every enemy attack also gets +1. |
 | ♣ Foresight | Keep the top card of the enemy pile face up: you always see the next enemy card. |
 
