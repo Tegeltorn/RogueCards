@@ -71,6 +71,22 @@ func enter() -> void:
 	stats.pressed.connect(func(): main.open_stats())
 	v.add_child(stats)
 
+	# Shown when a newer build is out (checked on start by ui/updater.gd).
+	var upd := Style.button("Update available – tap to update", Style.GREEN, 28)
+	upd.visible = main.updater != null and main.updater.available
+	upd.pressed.connect(func():
+		upd.text = "Updating…"
+		upd.disabled = true
+		main.updater.apply())
+	v.add_child(upd)
+	if main.updater != null and not main.updater.available:
+		main.updater.update_available.connect(func():
+			if is_instance_valid(upd):
+				upd.visible = true
+				upd.pivot_offset = upd.size / 2
+				upd.scale = Vector2(0.9, 0.9)
+				upd.create_tween().tween_property(upd, "scale", Vector2.ONE, 0.3).set_trans(Tween.TRANS_SINE))
+
 	var toggles := HFlowContainer.new()
 	toggles.alignment = FlowContainer.ALIGNMENT_CENTER
 	toggles.add_theme_constant_override("h_separation", 10)
@@ -84,7 +100,10 @@ func enter() -> void:
 			main.apply_settings())
 		toggles.add_child(cb)
 	v.add_child(toggles)
-	var hint := Style.label("Hold the title for the debug menu", 18, Color(Style.MUTED, 0.6))
+	var hint_text := "Hold the title for the debug menu"
+	if main.updater != null and not main.updater.build.is_empty():
+		hint_text += "  ·  build %s" % str(main.updater.build.get("sha", "")).left(7)
+	var hint := Style.label(hint_text, 18, Color(Style.MUTED, 0.6))
 	v.add_child(hint)
 
 	var help := Style.button("?", Style.BLUE, 34)

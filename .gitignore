@@ -8,6 +8,8 @@ export_credentials.cfg
 
 # Build output
 /build/
+# Written by CI into each build (commit sha for the update check)
+/config/build.json
 
 # OS / editor
 .DS_Store

@@ -25,6 +25,7 @@ const StatsView := preload("res://ui/screens/stats_view.gd")
 
 var engine: GameEngine
 var sfx: Sfx
+var updater  # ui/updater.gd: looks for a newer build on start
 var settings: Dictionary
 var debug_unlocked := false
 var screen: Control
@@ -81,6 +82,8 @@ func _ready() -> void:
 	_crt.z_index = 110
 	sfx = Sfx.new()
 	add_child(sfx)
+	updater = load("res://ui/updater.gd").new()
+	add_child(updater)
 	# Every button and toggle plucks the harp when pressed (cards use paper sounds instead).
 	get_tree().node_added.connect(_on_node_added)
 	apply_settings()
