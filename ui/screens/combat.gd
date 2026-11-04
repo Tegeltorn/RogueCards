@@ -247,7 +247,7 @@ func _tappable(c: Control, fn: Callable) -> void:
 	c.mouse_filter = Control.MOUSE_FILTER_STOP
 	c.gui_input.connect(func(ev: InputEvent):
 		if ev is InputEventMouseButton and ev.button_index == MOUSE_BUTTON_LEFT and not ev.pressed and not main.is_busy():
-			main.sfx.play("select")
+			main.sfx.play("card")
 			fn.call())
 
 
@@ -728,7 +728,7 @@ func _on_card_tapped(cv: CardView) -> void:
 	if s.phase == Phase.PLAY:
 		# Tap inspects one card (tooltip + preview); drag it onto the enemy to play it.
 		_selected = [] if _selected.has(c.id) else [c.id]
-		main.sfx.play("select")
+		main.sfx.play("card")
 	elif s.phase == Phase.RETAIN:
 		if _retain_sel.has(c.id):
 			_retain_sel.erase(c.id)
@@ -736,7 +736,7 @@ func _on_card_tapped(cv: CardView) -> void:
 			if _retain_sel.size() >= _e.retain_limit():
 				_retain_sel.pop_front()
 			_retain_sel.append(c.id)
-		main.sfx.play("select")
+		main.sfx.play("card")
 	_update_controls()
 
 
@@ -751,6 +751,7 @@ func _on_drag_started(cv: CardView) -> void:
 	if main.is_busy() or _e.state.phase != Phase.PLAY:
 		return
 	_selected = [cv.card_id]
+	main.sfx.play("card", 0.9)
 	cv.z_index = 60
 	cv.set_selected(false)
 	_update_controls()

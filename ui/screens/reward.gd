@@ -215,7 +215,7 @@ func _on_option(id: int) -> void:
 	if main.is_busy() or _animating:
 		return
 	_opt_sel = -1 if _opt_sel == id else id
-	main.sfx.play("select")
+	main.sfx.play("card")
 	_update_sel()
 
 
@@ -223,7 +223,7 @@ func _on_deck(id: int) -> void:
 	if main.is_busy() or _animating or not _deck_pickable():
 		return
 	_deck_sel = -1 if _deck_sel == id else id
-	main.sfx.play("select")
+	main.sfx.play("card")
 	_update_sel()
 
 

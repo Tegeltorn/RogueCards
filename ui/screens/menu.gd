@@ -49,7 +49,7 @@ func enter() -> void:
 
 	var play := Style.button("New run", Style.RED, 38)
 	play.custom_minimum_size.y = 96
-	play.pressed.connect(func(): main.sfx.play("select"); main.new_run())
+	play.pressed.connect(func(): main.new_run())
 	v.add_child(play)
 
 	var h := HBoxContainer.new()

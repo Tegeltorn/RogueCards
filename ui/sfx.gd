@@ -1,9 +1,9 @@
 extends Node
 ## Sound effects, synthesized in code (no audio files, nothing to license).
 ##
-## Palette to match the manuscript look: plucked lute/harp strings (Karplus-Strong), wooden knocks
-## on a table, parchment rustles, a frame drum and a small hand bell, all in D dorian, with a short
-## room reverb. Sounds are built one per frame after start-up so loading stays smooth;
+## Palette to match the manuscript look. Everything done with a card sounds like paper (picking up,
+## sliding, laying down, flipping, tearing); buttons and good news use plucked harp strings
+## (Karplus-Strong); blows use a wooden shield, a frame drum and a hand bell. D dorian, short room reverb. Sounds are built one per frame after start-up so loading stays smooth;
 ## one that is needed before it is built is built on the spot.
 
 const RATE := 24000
@@ -24,7 +24,7 @@ const A5 := 880.0
 const D6 := 1174.66
 
 ## Peak level of each sound (0..1), so plucks, knocks and bells sit at a balanced loudness.
-const LEVEL := {"select": 0.3, "draw": 0.35, "play": 0.5, "flip": 0.28, "block": 0.6, "hit": 0.75,
+const LEVEL := {"select": 0.3, "card": 0.32, "draw": 0.35, "play": 0.5, "flip": 0.28, "block": 0.6, "hit": 0.75,
 	"defeat": 0.45, "exact": 0.5, "reward": 0.45, "crack": 0.55, "win": 0.6, "lose": 0.6}
 
 var enabled := true
@@ -35,7 +35,7 @@ var _next := 0
 
 
 func _ready() -> void:
-	_pending = ["select", "draw", "play", "flip", "block", "hit", "defeat", "exact", "reward", "crack", "win", "lose"]
+	_pending = ["select", "card", "draw", "play", "flip", "block", "hit", "defeat", "exact", "reward", "crack", "win", "lose"]
 	for i in 8:
 		var p := AudioStreamPlayer.new()
 		add_child(p)
@@ -71,17 +71,21 @@ func play(name: String, pitch: float = 1.0) -> void:
 func _build(name: String) -> AudioStreamWAV:
 	var b := PackedFloat32Array()
 	match name:
-		"select":  # a light harp pluck
+		"select":  # buttons: a light harp pluck
 			b = _buf(0.45)
 			_add(b, _pluck(D5, 0.45, 0.75, 0.9965), 0.0, 0.3)
+		"card":  # a card picked up / tapped: a crisp paper flick
+			b = _buf(0.12)
+			_add(b, _rustle(0.035, 0.85, 0.002), 0.0, 0.7)
+			_add(b, _rustle(0.09, 0.45, 0.015), 0.01, 0.35)
 		"draw":  # a card slid off the deck
 			b = _buf(0.16)
 			_add(b, _rustle(0.14, 0.35, 0.02), 0.0, 0.5)
-		"play":  # a card laid on a wooden table
+		"play":  # a card slid and slapped down on the table
 			b = _buf(0.3)
-			_add(b, _rustle(0.07, 0.4, 0.01), 0.0, 0.35)
-			_add(b, _knock(165.0, 0.16), 0.05, 0.6)
-			_add(b, _knock(410.0, 0.06), 0.05, 0.2)
+			_add(b, _rustle(0.09, 0.45, 0.02), 0.0, 0.4)
+			_add(b, _thud(0.09), 0.08, 0.8)
+			_add(b, _rustle(0.03, 0.8, 0.001), 0.08, 0.35)
 		"flip":  # a parchment flick
 			b = _buf(0.1)
 			_add(b, _rustle(0.06, 0.7, 0.004), 0.0, 0.35)
@@ -109,11 +113,9 @@ func _build(name: String) -> AudioStreamWAV:
 			var notes := [D4, F4, A4, D5]
 			for i in notes.size():
 				_add(b, _pluck(notes[i], 0.9, 0.65, 0.998), i * 0.085, 0.24)
-		"crack":  # an ace splintering
+		"crack":  # an ace torn in two: a paper tear
 			b = _buf(0.45)
-			_add(b, _knock(95.0, 0.2), 0.0, 0.5)
-			for i in 7:
-				_add(b, _rustle(0.02, 0.85, 0.001), 0.02 + i * 0.035 + randf() * 0.02, 0.45 - i * 0.05)
+			_add(b, _tear(0.38), 0.0, 0.8)
 		"win":  # a short modal fanfare over a drone
 			b = _buf(2.6)
 			_add(b, _pluck(D3, 2.2, 0.4, 0.9992), 0.0, 0.2)
@@ -186,6 +188,38 @@ func _rustle(dur: float, tone: float, attack: float) -> PackedFloat32Array:
 		lo2 += (lo - lo2) * 0.04
 		var env := float(i) / a if i < a else pow(1.0 - float(i - a) / maxf(1.0, n - a), 2.0)
 		out[i] = (lo - lo2) * env * 1.6
+	return out
+
+
+## Paper landing on wood: a dull, heavily filtered noise thump.
+func _thud(dur: float) -> PackedFloat32Array:
+	var out := _buf(dur)
+	var lo := 0.0
+	var lo2 := 0.0
+	for i in out.size():
+		var t := float(i) / RATE
+		lo += (randf() * 2.0 - 1.0 - lo) * 0.12
+		lo2 += (lo - lo2) * 0.2
+		out[i] = lo2 * 3.0 * exp(-t * 45.0) * minf(1.0, t * 2000.0)
+	return out
+
+
+## Paper tear: many tiny fibre snaps, getting denser, over a thin rustle.
+func _tear(dur: float) -> PackedFloat32Array:
+	var out := _buf(dur)
+	var n := out.size()
+	var hi := 0.0
+	var lo := 0.0
+	for i in n:
+		var x := float(i) / n
+		var w := randf() * 2.0 - 1.0
+		hi += (w - hi) * 0.7
+		lo += (hi - lo) * 0.05
+		# snaps: random spikes whose rate rises through the tear, then stops abruptly
+		var rate := 0.002 + 0.03 * x
+		var snap := (randf() * 2.0 - 1.0) * 2.5 if randf() < rate else 0.0
+		var env := minf(1.0, x * 12.0) * (1.0 if x < 0.85 else (1.0 - x) / 0.15)
+		out[i] = ((hi - lo) * (0.35 + 0.4 * x) + snap) * env
 	return out
 
 

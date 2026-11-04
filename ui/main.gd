@@ -81,6 +81,8 @@ func _ready() -> void:
 	_crt.z_index = 110
 	sfx = Sfx.new()
 	add_child(sfx)
+	# Every button and toggle plucks the harp when pressed (cards use paper sounds instead).
+	get_tree().node_added.connect(_on_node_added)
 	apply_settings()
 	show_screen("menu")
 
@@ -126,6 +128,11 @@ func _apply_palette() -> void:
 		show_screen(n)
 		if screen.has_method("refresh"):
 			screen.refresh()
+
+
+func _on_node_added(n: Node) -> void:
+	if n is BaseButton:
+		(n as BaseButton).pressed.connect(func(): sfx.play("select"))
 
 
 # ---------------------------------------------------------------- run control
