@@ -16,7 +16,7 @@ Each round:
 1. **Reveal** the top enemy card. Black = attack, red = shield. Its value is its rank.
 2. **Fill your hand** up to `hand_size` cards (`boss_hand_size` against the kings). Cards you didn't play last round are still in your hand. If the draw pile is empty, shuffle the discard pile into a new one.
 3. **Play** any cards you like. Only the right colour counts against the enemy: red cards block attacks, black cards break shields. Cards of the wrong colour still trigger their own effects (♦ draws, ♥ stores shield).
-   - **Attack:** if your block is enough you are safe, otherwise you take damage. The enemy card is beaten either way.
+   - **Attack:** if your block is enough the attack is beaten. Otherwise you take damage, and (with `failed_attack_returns`) the attack card goes to the bottom of the enemy pile and comes back. Sacrificing an ace to block it is often worth it.
    - **Shield:** if your attack is enough the shield is beaten. Otherwise it goes to the bottom of the enemy pile.
    - **Last stand:** if you fail against a shield and there are no black cards left in the enemy pile, lose 1 life and the shield counts as beaten.
 4. **End your turn:** the revealed enemy card is resolved as above. Every played card goes to the discard pile; unplayed cards stay in your hand (`keep_hand`). With `keep_hand` off, you instead keep up to `retain` unplayed cards and discard the rest.
@@ -82,6 +82,7 @@ A test keeps these values in sync with `config/balance.json`.
 | `lives` | 3 | Number of life aces |
 | `short_floors` | [4,5] | Floors with only 3 enemies |
 | `graded_threshold` | 4 | Miss that costs 2 lives |
+| `failed_attack_returns` | true | An attack you fail to block goes to the bottom of the enemy pile |
 | `club_pair_bonus` | 1 | Clubs bonus |
 | `overpower_multiplier` | 2 | Black value needed to overpower an attack (× its value) |
 | `overpower_draw` | 1 | Cards drawn on overpower |

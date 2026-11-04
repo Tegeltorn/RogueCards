@@ -632,6 +632,8 @@ func _update_total() -> void:
 		if miss > 0:
 			var lives := 2 if miss >= int(s.balance["graded_threshold"]) else 1
 			_need_label.text = "Miss by %d: -%d %s" % [miss, lives, "life" if lives == 1 else "lives"]
+			if bool(s.balance.get("failed_attack_returns", false)):
+				_need_label.text += ", and it comes back"
 		elif _e.lockout_risk():
 			_need_label.text = "Not enough: -1 life"
 		else:
@@ -1003,6 +1005,17 @@ func play_event(ev: Dictionary) -> float:
 				main.toast("BREAK!", Style.GOLD, 600)
 			main.shake(8.0)
 			return 0.45
+		Ev.ATTACK_RETURNED:
+			# Not blocked: the attack card slides off to the bottom of the enemy pile.
+			if _enemy_views.has(ev["id"]):
+				var cv: CardView = _enemy_views[ev["id"]]
+				var tw := cv.create_tween()
+				tw.tween_property(cv, "position:y", cv.position.y - 30, 0.12).set_trans(Tween.TRANS_SINE)
+				tw.tween_property(cv, "position:y", cv.position.y + 500, 0.35).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN)
+				tw.parallel().tween_property(cv, "modulate:a", 0.0, 0.35)
+			main.toast("It comes back", Style.MUTED, 680, 40)
+			main.sfx.play("play", 0.85)
+			return 0.55
 		Ev.ATTACK_FAILED:
 			main.toast("The shield holds", Style.BLUE, 600, 48)
 			for id in _enemy_views:
