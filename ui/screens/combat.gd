@@ -626,7 +626,10 @@ func _update_total() -> void:
 	var fs := 40 if parts.size() > 1 else 60
 	_total_label.text = "[center][font_size=%d][color=%s]%s[/color][/font_size][/center]" % [fs, col, "  ".join(parts)]
 	if ok:
-		_need_label.text = "Exact!" if exact else "Enough"
+		if exact and int(s.balance.get("perfect_draw", 0)) > 0:
+			_need_label.text = "Perfect! +%d card next hand" % int(s.balance["perfect_draw"])
+		else:
+			_need_label.text = "Exact!" if exact else "Enough"
 	else:
 		var miss := int(t["block_need"]) - int(t["block"])
 		if miss > 0:
@@ -828,18 +831,15 @@ func _tap_enemy(cv: CardView) -> void:
 	_layout_hand()
 
 
-## End turn: plays anything still selected, then resolves the round (or confirms the kept card).
+## End turn: resolves the round (or confirms the kept card). It never plays the selected card.
 func _on_main() -> void:
 	if main.is_busy():
 		return
 	var s = _e.state
 	if s.phase == Phase.PLAY:
-		var sel := _selected.duplicate()
+		# End turn only ends the turn: a selected (inspected) card stays in hand.
 		_selected.clear()
-		main.act(func():
-			if not sel.is_empty():
-				_e.play_cards(sel)
-			_e.resolve())
+		main.act(func(): _e.resolve())
 	elif s.phase == Phase.RETAIN:
 		var keep := _retain_sel.duplicate()
 		_retain_sel.clear()
@@ -982,7 +982,7 @@ func play_event(ev: Dictionary) -> float:
 			main.haptic(1)  # the attack plays out
 			if ev["exact"]:
 				main.flash(Color(1, 1, 1, 0.7), 0.35)
-				main.toast("EXACT!", Style.GOLD, 600)
+				main.toast("PERFECT!", Style.GOLD, 600)
 				main.sfx.play("exact")
 			else:
 				main.toast("BLOCK!", Style.BLUE, 600)
@@ -995,6 +995,9 @@ func play_event(ev: Dictionary) -> float:
 			main.toast("-%d %s" % [ev["lives"], "LIFE" if ev["lives"] == 1 else "LIVES"], Style.RED, 600)
 			main.sfx.play("hit")
 			return 0.6
+		Ev.PERFECT:
+			main.toast("+%d CARD NEXT HAND" % int(ev["draw"]), Style.GOLD, 680, 40)
+			return 0.3
 		Ev.SHIELD_STORED:
 			main.toast("+%d SHIELD STORED" % ev["amount"], Style.BLUE, 680, 40)
 			return 0.25
@@ -1002,7 +1005,7 @@ func play_event(ev: Dictionary) -> float:
 			main.haptic(1)  # the attack plays out
 			if ev["exact"]:
 				main.flash(Color(1, 1, 1, 0.7), 0.35)
-				main.toast("EXACT!", Style.GOLD, 600)
+				main.toast("PERFECT!", Style.GOLD, 600)
 				main.sfx.play("exact")
 			else:
 				main.toast("BREAK!", Style.GOLD, 600)

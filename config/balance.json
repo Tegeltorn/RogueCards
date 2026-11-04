@@ -20,6 +20,7 @@
   "club_pair_bonus": 1,
   "overpower_multiplier": 2,
   "overpower_draw": 1,
+  "perfect_draw": 1,
   "ace_value": 14,
   "ace_sac_enabled": true,
   "ace_sac_own_color": true,

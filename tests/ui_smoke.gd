@@ -119,12 +119,16 @@ func _reward_via_ui(main) -> void:
 	var scr = main.screen
 	var s = main.engine.state
 	if s.phase == main.Phase.REWARD:
-		scr._on_option(s.reward["options"][0].id)
+		var picks: int = mini(int(s.reward["picks"]), s.reward["options"].size())
+		# ♦ arrives preselected; otherwise select as many options as allowed.
+		for c in s.reward["options"]:
+			if scr._opt_sels.size() < picks and not scr._opt_sels.has(c.id):
+				scr._on_option(c.id)
 	if scr._deck_pickable():
 		scr._on_deck(s.deck[0].id)
 	await _shot(main, "reward_selected_" + s.phase_name())
 	if scr._confirm.disabled:
-		push_error("reward confirm disabled in " + s.phase_name())
+		push_error("reward confirm disabled in %s: %s" % [s.phase_name(), scr._confirm.text])
 		main.act(func(): Bot.new().step(main.engine))
 		return
 	await scr._on_confirm()

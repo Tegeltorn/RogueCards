@@ -126,6 +126,7 @@ static func rules_overlay(main) -> Control:
 Tip: select a single card to see what it does.
 
 %s  If your block is too low you lose a life (a miss of %d or more costs 2). %s
+%s  Block exactly the attack, or break a shield with exactly its value: draw %d extra card in your next hand.
 %s  Once per round, black cards played against an attack worth %d× its value: they are discarded and you draw 1 card. The enemy still attacks at End turn.
 %s  Break it with enough attack, or it goes to the bottom of the enemy pile and comes back.
 %s  Your aces at the bottom. Tap them to see them, or to sacrifice one: you lose that life and it counts as %d this round.
@@ -137,6 +138,7 @@ Tip: select a single card to see what it does.
 		H % "SUITS", str(b["spade_multiplier"]), int(b["club_pair_bonus"]),
 		H % "ATTACK", int(b["graded_threshold"]),
 		("An attack you don't block goes to the bottom of the enemy pile and comes back: sacrificing an ace to block it can be worth it." if bool(b.get("failed_attack_returns", false)) else "The attack card is beaten either way."),
+		H % "PERFECT", int(b.get("perfect_draw", 1)),
 		H % "OVERPOWER", int(b.get("overpower_multiplier", 2)),
 		H % "SHIELD",
 		H % "LIVES", int(b["ace_value"]),

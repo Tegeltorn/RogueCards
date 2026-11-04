@@ -7,6 +7,7 @@ extends RefCounted
 ## - attaches the red joker to its highest card
 
 const GameState := preload("res://engine/game_state.gd")
+const EXACT_BONUS := 25  # cost units (10 per card value point) a perfect hit is worth to the bot
 const Phase := GameState.Phase
 
 
@@ -141,7 +142,7 @@ static func _cheapest_set(e, cards: Array, full: bool) -> Array:
 			if mask & (1 << i):
 				sub.append(cards[i])
 				cost += cards[i].value() * 10 + 1
-		if cost >= best_cost:
+		if cost - EXACT_BONUS >= best_cost:
 			continue
 		var t: Dictionary = e.compute(s.played + sub)
 		var ok: bool
@@ -149,7 +150,13 @@ static func _cheapest_set(e, cards: Array, full: bool) -> Array:
 			ok = int(t["block"]) >= bneed and int(t["attack"]) >= aneed
 		else:
 			ok = bneed - int(t["block"]) < graded
-		if ok:
+		if ok and full and int(s.balance.get("perfect_draw", 0)) > 0:
+			# A perfect hit (exactly the enemy value) draws an extra card: worth a little overspend.
+			var exact_b: bool = bneed <= 0 or int(t["block"]) == bneed
+			var exact_a: bool = aneed <= 0 or int(t["attack"]) == aneed
+			if exact_b and exact_a:
+				cost -= EXACT_BONUS
+		if ok and cost < best_cost:
 			best = sub
 			best_cost = cost
 	return best

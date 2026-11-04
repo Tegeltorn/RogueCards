@@ -28,6 +28,8 @@ Each round:
 | ♠ | Attack. Value × 1.5, rounded down (2→3, 3→4, 5→7 …). |
 | ♣ | Attack. +`club_pair_bonus` if you play at least two clubs in the same round. |
 
+**Perfect:** when your block exactly equals the attack, or your attack exactly equals the shield, draw `perfect_draw` extra card in your next hand.
+
 Black cards played against an attack don't block. **Overpower:** once per round, when the black cards you have played against an attack add up to at least `overpower_multiplier` × its value (♠ × 1.5 and the ♣ bonus count), discard them right away and draw `overpower_draw` card. The enemy still attacks when you end your turn.
 
 **Damage:** a miss of 1 to `graded_threshold` − 1 costs 1 life. A bigger miss costs 2 lives. Put lost aces aside. When you have no aces left, you lose.
@@ -40,7 +42,7 @@ The suit of the **last beaten enemy card** decides the reward. You choose among 
 | Last card | Reward |
 |---|---|
 | ♠ | Pick any of the beaten cards. |
-| ♣ | Reveal 2, take 1. Then remove 1 card of your choice from your deck. |
+| ♣ | Reveal 2, take 1, and remove 1 card of your choice from your deck (choose both together). |
 | ♥ | Get one lost life back. With all lives: reveal 2 and take 1. |
 | ♦ | Reveal 2 and take both. |
 
@@ -86,3 +88,4 @@ A test keeps these values in sync with `config/balance.json`.
 | `club_pair_bonus` | 1 | Clubs bonus |
 | `overpower_multiplier` | 2 | Black value needed to overpower an attack (× its value) |
 | `overpower_draw` | 1 | Cards drawn on overpower |
+| `perfect_draw` | 1 | Extra cards next hand after a perfect hit |

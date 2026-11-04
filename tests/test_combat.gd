@@ -261,3 +261,12 @@ func test_failed_block_beaten_when_rule_off() -> void:
 	e.resolve()
 	check(not has_event(e, Ev.ATTACK_RETURNED), "no return")
 	check(has_event(e, Ev.ENEMY_DEFEATED), "beaten either way")
+
+
+func test_perfect_hit_draws_extra_next_hand() -> void:
+	var e := scenario(["5H", "3S"], ["5S"], {"hand_size": 2, "perfect_draw": 1}, {"pile": ["6S"]})
+	e.state.draw_pile = cards(e, ["2D", "3D", "4D"])
+	e.play_cards([e.state.hand[0].id])  # exactly 5
+	e.resolve()
+	check(has_event(e, Ev.PERFECT), "perfect block")
+	eq(e.state.hand.size(), 3, "3♠ kept + fill to 2 + 1 extra")

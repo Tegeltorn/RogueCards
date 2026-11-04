@@ -97,3 +97,22 @@ func test_red_joker_after_jack_floor() -> void:
 	eq(target.joker, "double", "spade theme = double")
 	eq(target.value(), 4, "2 doubled")
 	eq(e.state.floor_num, 12, "next floor")
+
+
+func test_reward_resolve_clubs_take_and_remove_at_once() -> void:
+	var e := _clear_with("3C", ["2H", "2D", "2S", "2C"], {"deck_cap": 0}, ["3H"])
+	var opt = e.state.reward["options"][0]
+	var old = e.state.deck[0]
+	check(e.removal_needed(1), "clubs: removal needed after taking one")
+	check(not e.reward_resolve([opt.id]), "removal missing")
+	check(e.reward_resolve([opt.id], old.id), "take + remove in one action")
+	check(e.state.deck.has(opt), "taken")
+	check(not e.state.deck.has(old), "removed")
+	check(e.state.phase != Phase.REWARD and e.state.phase != Phase.REWARD_REMOVE, "reward finished")
+
+
+func test_reward_resolve_diamonds_both_at_once() -> void:
+	var e := _clear_with("3D", ["2H", "2D", "2S"], {"deck_cap": 0}, ["3H", "3S"])
+	var ids: Array = e.state.reward["options"].map(func(c): return c.id)
+	check(e.reward_resolve(ids), "take both")
+	eq(e.state.deck.size(), 5, "deck grew by two")

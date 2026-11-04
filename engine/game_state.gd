@@ -34,6 +34,7 @@ var last_beaten = null
 
 var carry_shield: int = 0   # stored ♥ overflow
 var overpowered := false    # overpower already triggered this round
+var bonus_draw: int = 0     # extra cards for the next hand (perfect hits)
 var round_num: int = 0
 var floor_round: int = 0
 

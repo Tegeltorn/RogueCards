@@ -196,7 +196,8 @@ func _next_round() -> void:
 	state.retained = []
 	var limit := int(state.balance["boss_hand_size"] if state.is_boss() else state.balance["hand_size"])
 	# Draw up to the hand size, but always at least `min_draw` cards.
-	var to_draw := maxi(limit - state.hand.size(), int(state.balance.get("min_draw", 0)))
+	var to_draw := maxi(limit - state.hand.size(), int(state.balance.get("min_draw", 0))) + state.bonus_draw
+	state.bonus_draw = 0
 	for i in to_draw:
 		var d = _draw_one()
 		if d == null:
@@ -522,6 +523,8 @@ func resolve() -> bool:
 		var new_carry := 0
 		if blk >= bneed:
 			_emit(Ev.BLOCKED, {"block": blk, "attack": bneed, "exact": blk == bneed})
+			if blk == bneed:
+				_perfect("block")
 			new_carry = mini(blk - bneed, t["hearts"])
 		else:
 			var miss := bneed - blk
@@ -552,6 +555,8 @@ func resolve() -> bool:
 		var shields := state.enemy_shield_cards()
 		if atk >= aneed:
 			_emit(Ev.ATTACK_SUCCEEDED, {"attack": atk, "shield": aneed, "exact": atk == aneed})
+			if atk == aneed:
+				_perfect("attack")
 			for e in shields:
 				_beat(e)
 		else:
@@ -610,6 +615,15 @@ func retain(ids: Array) -> bool:
 	_emit(Ev.RETAINED, {"cards": _labels(keep), "ids": _ids(keep)})
 	_next_round()
 	return true
+
+
+## Perfect block / attack (exactly the enemy value): extra card(s) in the next hand.
+func _perfect(kind: String) -> void:
+	var n := int(state.balance.get("perfect_draw", 0))
+	if n <= 0:
+		return
+	state.bonus_draw += n
+	_emit(Ev.PERFECT, {"kind": kind, "draw": n})
 
 
 func _beat(e) -> void:
@@ -728,6 +742,66 @@ func reward_decline(option_id: int) -> bool:
 	_emit(Ev.REWARD_SKIPPED, {"card": c.label()})
 	_after_pick()
 	return true
+
+
+## The whole reward as one action: take `take_ids` (when the deck is full, `replace_ids[i]` is swapped out
+## for `take_ids[i]`), decline the other picks, and for ♣ remove `remove_id` from the deck (an old card).
+func reward_resolve(take_ids: Array, remove_id: int = -1, replace_ids: Array = []) -> bool:
+	if state.phase != Phase.REWARD:
+		return false
+	var r: Dictionary = state.reward
+	var opts: Array = r["options"]
+	var picks := mini(int(r["picks"]), opts.size())
+	var takes: Array = []
+	for id in take_ids:
+		var c = state.find_in(opts, id)
+		if c == null or takes.has(c):
+			return false
+		takes.append(c)
+	if takes.size() > picks or (takes.size() < picks and not can_decline()):
+		return false
+	var replaced: Array = []
+	var size := state.deck.size()
+	var cap := int(state.balance["deck_cap"])
+	for i in takes.size():
+		if cap > 0 and size >= cap:
+			var rep = state.find_in(state.deck, int(replace_ids[i]) if i < replace_ids.size() else -1)
+			if rep == null or replaced.has(rep):
+				return false
+			replaced.append(rep)
+		else:
+			replaced.append(null)
+			size += 1
+	var need_remove: bool = r.get("remove", false) and size > int(state.balance["deck_min"])
+	var removed = null
+	if need_remove:
+		removed = state.find_in(state.deck, remove_id)
+		if removed == null or replaced.has(removed):
+			return false
+	for i in takes.size():
+		var c = takes[i]
+		var rep = replaced[i]
+		if rep != null:
+			state.deck.erase(rep)
+		state.deck.append(c)
+		opts.erase(c)
+		_emit(Ev.REWARD_TAKEN, {"card": c.label(), "id": c.id, "replaced": rep.label() if rep else "",
+			"replaced_id": rep.id if rep else -1})
+	if takes.size() < picks:
+		_emit(Ev.REWARD_SKIPPED, {})
+	if removed != null:
+		state.deck.erase(removed)
+		_emit(Ev.CARD_REMOVED, {"card": removed.label(), "id": removed.id})
+	_finish_reward()
+	return true
+
+
+## True when the ♣ reward still requires removing a card after taking `n_takes` cards.
+func removal_needed(n_takes: int) -> bool:
+	if state.phase != Phase.REWARD or not state.reward.get("remove", false):
+		return false
+	var size := state.deck.size() + (0 if deck_full() else n_takes)
+	return size > int(state.balance["deck_min"])
 
 
 func reward_remove(card_id: int) -> bool:

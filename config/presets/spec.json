@@ -33,5 +33,12 @@
       0.22
     ]
   },
-  "keep_hand": false
+  "keep_hand": false,
+  "perfect_draw": 0,
+  "reward_optional": false,
+  "free_discard": false,
+  "min_draw": 0,
+  "failed_attack_returns": false,
+  "overpower_multiplier": 0,
+  "overpower_draw": 1
 }
