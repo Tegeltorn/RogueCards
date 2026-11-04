@@ -281,7 +281,8 @@ func can_play_card(c) -> bool:
 
 ## True if the card counts against the revealed enemy (right colour: red vs attack, black vs shield).
 func is_effective(c) -> bool:
-	return (block_need() > 0 and c.is_red()) or (attack_need() > 0 and c.is_black())
+	return (block_need() > 0 and c.is_red()) or (attack_need() > 0 and c.is_black()) \
+		or (c.is_red() and lockout_risk())
 
 
 ## Cards in hand that count against the current enemy (used by the bot and for highlighting).
@@ -348,7 +349,7 @@ func _attack_val(c) -> int:
 func compute(cards: Array) -> Dictionary:
 	var bneed := block_need()
 	var aneed := attack_need()
-	var carry := state.carry_shield if bneed > 0 else 0
+	var carry := state.carry_shield if bneed > 0 or lockout_risk() else 0
 	var reds: Array = []
 	var blacks: Array = []
 	var duals: Array = []
@@ -566,11 +567,21 @@ func resolve() -> bool:
 					black_left = true
 					break
 			if not black_left:
-				_emit(Ev.LOCKOUT, {"attack": atk, "shield": aneed})
-				if _lose_lives(1, "lockout"):
-					return true
-				for e in shields:
-					_beat(e)
+				# Last stand: the cornered shield strikes back with its value. Red cards can block it.
+				var lblk: int = t["block"]
+				if lblk >= aneed:
+					_emit(Ev.LAST_STAND_BLOCKED, {"block": lblk, "shield": aneed, "exact": lblk == aneed})
+					if lblk == aneed:
+						_perfect("block")
+					state.carry_shield = mini(lblk - aneed, int(t["hearts"]))
+					for e in shields:
+						_beat(e)
+				else:
+					_emit(Ev.LOCKOUT, {"attack": atk, "shield": aneed, "block": lblk})
+					if _lose_lives(1, "lockout"):
+						return true
+					for e in shields:
+						_beat(e)
 			else:
 				_emit(Ev.ATTACK_FAILED, {"attack": atk, "shield": aneed})
 				for e in shields:

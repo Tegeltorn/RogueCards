@@ -617,7 +617,18 @@ func _update_total() -> void:
 		ok = ok and int(t["block"]) >= int(t["block_need"])
 		exact = int(t["block"]) == int(t["block_need"])
 		total += int(t["block"])
-	if int(t["attack_need"]) > 0:
+	if int(t["attack_need"]) > 0 and int(t["block_need"]) == 0 and _e.lockout_risk():
+		# Last stand: break the shield OR block its desperate strike.
+		var an := int(t["attack_need"])
+		parts.append("ATTACK %d / %d" % [t["attack"], an])
+		parts.append("[font_size=30]or[/font_size]")
+		parts.append("BLOCK %d / %d" % [t["block"], an])
+		var by_atk := int(t["attack"]) >= an
+		var by_blk := int(t["block"]) >= an
+		ok = by_atk or by_blk
+		exact = (by_atk and int(t["attack"]) == an) or (not by_atk and by_blk and int(t["block"]) == an)
+		total += int(t["attack"]) + int(t["block"])
+	elif int(t["attack_need"]) > 0:
 		parts.append("ATTACK %d / %d" % [t["attack"], t["attack_need"]])
 		ok = ok and int(t["attack"]) >= int(t["attack_need"])
 		exact = exact or int(t["attack"]) == int(t["attack_need"])
@@ -638,7 +649,7 @@ func _update_total() -> void:
 			if bool(s.balance.get("failed_attack_returns", false)):
 				_need_label.text += ", and it comes back"
 		elif _e.lockout_risk():
-			_need_label.text = "Not enough: -1 life"
+			_need_label.text = "Break it or block its strike, or lose a life"
 		else:
 			_need_label.text = "The shield holds"
 	_need_label.add_theme_color_override("font_color", Style.MUTED)
@@ -713,7 +724,7 @@ func _update_showdown() -> void:
 		_showdown.visible = false
 		return
 	var flavour: String = SHOWDOWN_FLAVOUR[int(s.current[0].id) % SHOWDOWN_FLAVOUR.size()]
-	_showdown_label.text = "[center][font_size=30][color=%s]LAST STAND![/color][/font_size]\n[color=%s]%s\nFail to break this shield and you lose a life.[/color][/center]" % [Style.hex(Style.GOLD.lightened(0.35)), Style.hex(Style.ON_DARK), flavour]
+	_showdown_label.text = "[center][font_size=30][color=%s]LAST STAND![/color][/font_size]\n[color=%s]%s\nBreak the shield or block its strike, or you lose a life.[/color][/center]" % [Style.hex(Style.GOLD.lightened(0.35)), Style.hex(Style.ON_DARK), flavour]
 	if not _showdown.visible:
 		_showdown.visible = true
 		_showdown.pivot_offset = Vector2(230, 50)
@@ -1034,6 +1045,12 @@ func play_event(ev: Dictionary) -> float:
 					tw.tween_property(cv, "position:y", cv.position.y + 500, 0.3).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
 					tw.parallel().tween_property(cv, "modulate:a", 0.0, 0.3)
 			main.sfx.play("block", 0.7)
+			return 0.6
+		Ev.LAST_STAND_BLOCKED:
+			main.haptic(1)  # the strike plays out
+			main.toast("STRIKE BLOCKED!", Style.GOLD, 560)
+			main.sfx.play("block")
+			main.shake(6.0)
 			return 0.6
 		Ev.LOCKOUT:
 			main.haptic(2)  # the attack plays out

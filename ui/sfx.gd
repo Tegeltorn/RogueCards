@@ -22,6 +22,16 @@ const D5 := 587.33
 const F5 := 698.46
 const A5 := 880.0
 const D6 := 1174.66
+const E5 := 659.25
+const G5 := 783.99
+const C6 := 1046.5
+
+## Harp notes for buttons: D dorian without B (no tritone), two octaves. Consecutive taps walk this
+## scale like a melody; fast taps run up and down the D minor chord tones like a strum.
+const HARP := [D4, E4, F4, G4, A4, C5, D5, E5, F5, G5, A5, C6, D6]
+const HARP_CHORD := [0, 2, 4, 5, 6, 8, 10, 11, 12]  # D F A C D F A C D
+const STRUM_GAP := 0.28   # taps closer than this strum
+const REST_GAP := 2.0     # after a pause, start again near the middle
 
 ## Peak level of each sound (0..1), so plucks, knocks and bells sit at a balanced loudness.
 const LEVEL := {"select": 0.3, "card": 0.32, "draw": 0.35, "play": 0.5, "flip": 0.28, "block": 0.6, "hit": 0.75,
@@ -32,10 +42,15 @@ var _streams: Dictionary = {}
 var _pending: Array = []
 var _players: Array = []
 var _next := 0
+var _harp_idx := 6        # D5
+var _harp_dir := 1
+var _harp_last := -10.0
 
 
 func _ready() -> void:
-	_pending = ["select", "card", "draw", "play", "flip", "block", "hit", "defeat", "exact", "reward", "crack", "win", "lose"]
+	for i in HARP.size():
+		_pending.append("harp_%d" % i)
+	_pending += ["select", "card", "draw", "play", "flip", "block", "hit", "defeat", "exact", "reward", "crack", "win", "lose"]
 	for i in 8:
 		var p := AudioStreamPlayer.new()
 		add_child(p)
@@ -54,6 +69,10 @@ func _process(_delta: float) -> void:
 func play(name: String, pitch: float = 1.0) -> void:
 	if not enabled:
 		return
+	if name == "select":
+		# Buttons: the next note of the harp line (kept in tune, so `pitch` is ignored).
+		name = "harp_%d" % _next_harp_note()
+		pitch = 1.0
 	if not _streams.has(name):
 		if not _pending.has(name):
 			return
@@ -62,14 +81,53 @@ func play(name: String, pitch: float = 1.0) -> void:
 	var p: AudioStreamPlayer = _players[_next]
 	_next = (_next + 1) % _players.size()
 	p.stream = _streams[name]
-	p.pitch_scale = pitch * randf_range(0.98, 1.02)
+	p.pitch_scale = pitch * (1.0 if name.begins_with("harp_") else randf_range(0.98, 1.02))
 	p.play()
 
 
 # ---------------------------------------------------------------- the sounds
 
+## Picks the next harp note so consecutive taps sound like music:
+## fast taps strum along the chord tones, slower taps step through the scale, a pause starts afresh.
+func _next_harp_note() -> int:
+	var now := Time.get_ticks_msec() / 1000.0
+	var gap := now - _harp_last
+	_harp_last = now
+	if gap > REST_GAP:
+		_harp_idx = [4, 6].pick_random()  # A4 or D5
+		_harp_dir = 1
+		return _harp_idx
+	if gap < STRUM_GAP:
+		# Strum: next chord tone in the current direction, turning at the ends.
+		var pos := HARP_CHORD.find(_harp_idx)
+		if pos < 0:
+			pos = 0
+			for k in HARP_CHORD.size():
+				if HARP_CHORD[k] <= _harp_idx:
+					pos = k
+		if pos + _harp_dir < 0 or pos + _harp_dir >= HARP_CHORD.size():
+			_harp_dir = -_harp_dir
+		_harp_idx = HARP_CHORD[pos + _harp_dir]
+		return _harp_idx
+	# Melody: a small step (mostly 1, sometimes 2), drifting back towards the middle.
+	var step: int = [1, 1, 1, 2].pick_random()
+	if randf() < 0.3:
+		_harp_dir = -_harp_dir
+	if _harp_idx >= 10:
+		_harp_dir = -1
+	elif _harp_idx <= 2:
+		_harp_dir = 1
+	_harp_idx = clampi(_harp_idx + step * _harp_dir, 0, HARP.size() - 1)
+	return _harp_idx
+
+
 func _build(name: String) -> AudioStreamWAV:
 	var b := PackedFloat32Array()
+	if name.begins_with("harp_"):
+		var f: float = HARP[int(name.substr(5))]
+		b = _buf(0.6)
+		_add(b, _pluck(f, 0.6, 0.7, 0.9968), 0.0, 0.3)
+		return _wav(_reverb(b, 0.16), float(LEVEL.get("select", 0.3)))
 	match name:
 		"select":  # buttons: a light harp pluck
 			b = _buf(0.45)

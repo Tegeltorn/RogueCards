@@ -13,6 +13,7 @@ const DECK_RESHUFFLED := "deck_reshuffled"
 const CARD_DRAWN := "card_drawn"
 const HAND_FILLED := "hand_filled"
 const CARDS_PLAYED := "cards_played"
+const LAST_STAND_BLOCKED := "last_stand_blocked"
 const PERFECT := "perfect"
 const CARD_DISCARDED := "card_discarded"
 const OVERPOWER := "overpower"
@@ -67,6 +68,7 @@ static func describe(e: Dictionary) -> String:
 		CARD_DRAWN: return "Drew %s" % e.get("card", "")
 		HAND_FILLED: return "Hand: %s" % ", ".join(e.get("hand", []))
 		CARDS_PLAYED: return "Played %s" % ", ".join(e.get("cards", []))
+		LAST_STAND_BLOCKED: return "Last stand: blocked its strike (%d vs %d), the shield falls" % [e.get("block", 0), e.get("shield", 0)]
 		PERFECT: return "Perfect %s! +%d card next hand" % [e.get("kind", ""), e.get("draw", 1)]
 		CARD_DISCARDED: return "Discarded %s" % e.get("card", "")
 		OVERPOWER: return "Overpower! %d vs attack %d: %s discarded, draw 1" % [e.get("attack", 0), e.get("enemy", 0), ", ".join(e.get("cards", []))]

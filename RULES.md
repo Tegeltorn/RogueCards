@@ -18,7 +18,7 @@ Each round:
 3. **Play** any cards you like. Only the right colour counts against the enemy: red cards block attacks, black cards break shields. Cards of the wrong colour still trigger their own effects (♦ draws, ♥ stores shield).
    - **Attack:** if your block is enough the attack is beaten. Otherwise you take damage, and (with `failed_attack_returns`) the attack card goes to the bottom of the enemy pile and comes back. Sacrificing an ace to block it is often worth it.
    - **Shield:** if your attack is enough the shield is beaten. Otherwise it goes to the bottom of the enemy pile.
-   - **Last stand:** if you fail against a shield and there are no black cards left in the enemy pile, lose 1 life and the shield counts as beaten.
+   - **Last stand:** a shield with no black cards left in the enemy pile strikes back with its value. Break it with attack, or block the strike with red cards (block ≥ its value). If you do neither, lose 1 life. Either way the shield counts as beaten.
 4. **End your turn:** the revealed enemy card is resolved as above. Every played card goes to the discard pile; unplayed cards stay in your hand (`keep_hand`). With `keep_hand` off, you instead keep up to `retain` unplayed cards and discard the rest.
 
 | Suit | Effect |

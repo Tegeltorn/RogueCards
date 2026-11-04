@@ -70,7 +70,9 @@ func _play_thrifty(e) -> void:
 		var aneed: int = e.attack_need()
 		var t: Dictionary = e.compute(s.played)
 		var short_block: bool = bneed > 0 and int(t["block"]) < bneed
-		var short_atk: bool = aneed > 0 and int(t["attack"]) < aneed
+		# At a last stand, blocking the shield's strike is as good as breaking it.
+		var stand_blocked: bool = e.lockout_risk() and bneed == 0 and int(t["block"]) >= aneed
+		var short_atk: bool = aneed > 0 and int(t["attack"]) < aneed and not stand_blocked
 		if not short_block and not short_atk:
 			break
 		var cards: Array = e.playable_cards()
@@ -147,13 +149,15 @@ static func _cheapest_set(e, cards: Array, full: bool) -> Array:
 		var t: Dictionary = e.compute(s.played + sub)
 		var ok: bool
 		if full:
-			ok = int(t["block"]) >= bneed and int(t["attack"]) >= aneed
+			var ls: bool = bneed <= 0 and e.lockout_risk()
+			ok = int(t["block"]) >= bneed and (int(t["attack"]) >= aneed or (ls and int(t["block"]) >= aneed))
 		else:
 			ok = bneed - int(t["block"]) < graded
 		if ok and full and int(s.balance.get("perfect_draw", 0)) > 0:
 			# A perfect hit (exactly the enemy value) draws an extra card: worth a little overspend.
 			var exact_b: bool = bneed <= 0 or int(t["block"]) == bneed
-			var exact_a: bool = aneed <= 0 or int(t["attack"]) == aneed
+			var exact_a: bool = aneed <= 0 or int(t["attack"]) == aneed \
+				or (bneed <= 0 and e.lockout_risk() and int(t["block"]) == aneed)
 			if exact_b and exact_a:
 				cost -= EXACT_BONUS
 		if ok and cost < best_cost:

@@ -270,3 +270,22 @@ func test_perfect_hit_draws_extra_next_hand() -> void:
 	e.resolve()
 	check(has_event(e, Ev.PERFECT), "perfect block")
 	eq(e.state.hand.size(), 3, "3♠ kept + fill to 2 + 1 extra")
+
+
+func test_last_stand_can_be_blocked() -> void:
+	var e := scenario(["9H", "2S"], ["8D"], {}, {"pile": ["6H"]})
+	check(e.lockout_risk(), "last stand")
+	check(e.is_effective(e.state.hand[0]), "red counts at a last stand")
+	e.play_cards([e.state.hand[0].id])
+	e.resolve()
+	check(has_event(e, Ev.LAST_STAND_BLOCKED), "strike blocked")
+	eq(e.state.lives.size(), 3, "no life lost")
+	check(not has_event(e, Ev.LOCKOUT), "no lockout")
+
+
+func test_last_stand_unblocked_costs_a_life() -> void:
+	var e := scenario(["3H"], ["8D"], {}, {"pile": ["6H"]})
+	e.play_cards([e.state.hand[0].id])
+	e.resolve()
+	check(has_event(e, Ev.LOCKOUT), "lockout")
+	eq(e.state.lives.size(), 2, "one life lost")
