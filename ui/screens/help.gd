@@ -37,7 +37,7 @@ static func card_info(b: Dictionary, c) -> String:
 ## A tooltip box (panel + label) for screens that list cards.
 static func tip_box() -> PanelContainer:
 	var p := PanelContainer.new()
-	p.add_theme_stylebox_override("panel", Style.box(Color(0.06, 0.04, 0.1, 0.96), Style.GOLD, 3, 12))
+	p.add_theme_stylebox_override("panel", Style.box(Color(Style.PANEL, 0.97), Color(Style.GOLD, 0.7), 2, 12))
 	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var l := Style.label("", 22, Style.WHITE, HORIZONTAL_ALIGNMENT_LEFT)
 	l.name = "Text"
