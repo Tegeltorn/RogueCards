@@ -42,8 +42,9 @@ var _recorded := false
 
 
 func _ready() -> void:
-	theme = Style.theme()
 	settings = Store.settings()
+	Style.set_night(bool(settings.get("night", false)))
+	theme = Style.theme()
 	_bg = ColorRect.new()
 	var bgm := ShaderMaterial.new()
 	bgm.shader = load("res://ui/fx/background.gdshader")
@@ -57,7 +58,7 @@ func _ready() -> void:
 	_holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_shake_root.add_child(_holder)
 	_flash = Style.full(ColorRect.new())
-	_flash.color = Color(1, 1, 1, 0)
+	_flash.color = Color(Style.GOLD, 0)
 	_flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_flash)
 	_overlay = Style.full(Control.new())
@@ -90,7 +91,32 @@ func _process(delta: float) -> void:
 func apply_settings() -> void:
 	_crt.visible = bool(settings.get("crt", true))
 	sfx.enabled = bool(settings.get("sound", true))
+	_apply_palette()
 	Store.save_settings(settings)
+
+
+## Pushes the current palette (day vellum or candlelit night) into the theme and the shaders.
+func _apply_palette() -> void:
+	var want := bool(settings.get("night", false))
+	var changed := want != Style.night
+	if changed:
+		Style.set_night(want)
+		theme = Style.theme()
+	var bgm: ShaderMaterial = _bg.material
+	bgm.set_shader_parameter("color_a", Style.BG_A)
+	bgm.set_shader_parameter("color_b", Style.BG_B)
+	bgm.set_shader_parameter("glow_strength", 0.07 if Style.night else 0.0)
+	bgm.set_shader_parameter("edge", 0.9 if Style.night else 0.55)
+	var crtm: ShaderMaterial = _crt.material
+	crtm.set_shader_parameter("tint", Color(0, 0, 0) if Style.night else Color(0.25, 0.14, 0.06))
+	crtm.set_shader_parameter("vignette", 0.4 if Style.night else 0.22)
+	if changed and screen != null:
+		# Screens bake colours in when built, so rebuild the visible one.
+		var n := screen_name
+		screen_name = ""
+		show_screen(n)
+		if screen.has_method("refresh"):
+			screen.refresh()
 
 
 # ---------------------------------------------------------------- run control
@@ -208,7 +234,7 @@ func quit_to_menu() -> void:
 func open_overlay(ctrl: Control) -> Control:
 	_overlay.mouse_filter = Control.MOUSE_FILTER_STOP
 	var dim := Style.full(ColorRect.new())
-	dim.color = Color(0, 0, 0, 0.6)
+	dim.color = Color(0, 0, 0, 0.6) if Style.night else Color(0.2, 0.13, 0.07, 0.38)
 	dim.mouse_filter = Control.MOUSE_FILTER_STOP
 	_overlay.add_child(dim)
 	var margin := Style.full(MarginContainer.new())
@@ -218,9 +244,12 @@ func open_overlay(ctrl: Control) -> Control:
 		margin.add_theme_constant_override("margin_" + side, 40)
 	dim.add_child(margin)
 	margin.add_child(ctrl)
-	ctrl.scale = Vector2(0.9, 0.9)
+	ctrl.scale = Vector2(0.97, 0.97)
+	ctrl.modulate.a = 0.0
 	ctrl.pivot_offset = Vector2(340, 600)
-	ctrl.create_tween().tween_property(ctrl, "scale", Vector2.ONE, 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	var otw := ctrl.create_tween().set_parallel()
+	otw.tween_property(ctrl, "scale", Vector2.ONE, 0.22).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	otw.tween_property(ctrl, "modulate:a", 1.0, 0.18)
 	ctrl.tree_exited.connect(func():
 		if is_instance_valid(dim):
 			dim.queue_free()
@@ -263,14 +292,20 @@ func confirm(text: String, choices: Array) -> void:
 	open_overlay(p)
 
 
+## Screen shake, kept to a gentle nudge (callers pass arcade-sized amounts).
 func shake(amount: float = 18.0) -> void:
-	_shake = maxf(_shake, amount)
+	_shake = maxf(_shake, minf(amount * 0.3, 8.0))
 
 
+## A soft wash of colour. Bright whites are turned into warm gold so nothing glares.
 func flash(color: Color = Color(1, 1, 1, 0.6), dur: float = 0.25) -> void:
-	_flash.color = color
+	var c := color
+	if c.s < 0.15:
+		c = Color(Style.GOLD.lightened(0.3), c.a)
+	c.a *= 0.4
+	_flash.color = c
 	var tw := create_tween()
-	tw.tween_property(_flash, "color:a", 0.0, dur)
+	tw.tween_property(_flash, "color:a", 0.0, dur * 1.6).set_trans(Tween.TRANS_SINE)
 
 
 func burst(pos: Vector2, color: Color, amount: int = 40) -> void:
@@ -279,20 +314,27 @@ func burst(pos: Vector2, color: Color, amount: int = 40) -> void:
 	p.amount = amount
 	p.one_shot = true
 	p.explosiveness = 1.0
-	p.lifetime = 0.8
+	# Drifting flakes of gold leaf / petals rather than an explosion.
+	p.amount = maxi(6, amount / 2)
+	p.lifetime = 1.3
 	p.direction = Vector2(0, -1)
 	p.spread = 180.0
-	p.initial_velocity_min = 250.0
-	p.initial_velocity_max = 650.0
-	p.gravity = Vector2(0, 1100)
-	p.scale_amount_min = 6.0
-	p.scale_amount_max = 14.0
-	p.color = color
-	p.angular_velocity_min = -400
-	p.angular_velocity_max = 400
+	p.initial_velocity_min = 80.0
+	p.initial_velocity_max = 260.0
+	p.damping_min = 60.0
+	p.damping_max = 120.0
+	p.gravity = Vector2(0, 160)
+	p.scale_amount_min = 3.0
+	p.scale_amount_max = 7.0
+	var ramp := Gradient.new()
+	ramp.set_color(0, color)
+	ramp.set_color(1, Color(color, 0.0))
+	p.color_ramp = ramp
+	p.angular_velocity_min = -120
+	p.angular_velocity_max = 120
 	_overlay.add_child(p)
 	p.emitting = true
-	get_tree().create_timer(1.2).timeout.connect(p.queue_free)
+	get_tree().create_timer(1.6).timeout.connect(p.queue_free)
 
 
 ## Animates a copy of `card` from one screen rect to another (e.g. a reward flying into the deck).
@@ -310,7 +352,7 @@ func fly_card(card, from: Rect2, to_pos: Vector2, to_size: Vector2, dur: float =
 	add_child(cv)
 	var sc := to_size.x / maxf(1.0, from.size.x)
 	var tw: Tween = cv.create_tween()
-	tw.tween_property(cv, "scale", Vector2(1.15, 1.15), 0.1).set_trans(Tween.TRANS_BACK)
+	tw.tween_property(cv, "scale", Vector2(1.06, 1.06), 0.1).set_trans(Tween.TRANS_SINE)
 	tw.tween_property(cv, "position", to_pos - (from.size - to_size) / 2, dur).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
 	tw.parallel().tween_property(cv, "scale", Vector2(sc, sc), dur).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
 	tw.tween_callback(func(): sfx.play("draw"))
@@ -318,21 +360,23 @@ func fly_card(card, from: Rect2, to_pos: Vector2, to_size: Vector2, dur: float =
 	return tw
 
 
-## Big popping text in the middle of the screen.
+## Large heading text that fades in over the middle of the screen, like a rubric.
 func toast(text: String, color: Color = Style.GOLD, y: float = 520.0, size: int = 64) -> void:
 	var l := Style.label(text, size, color)
-	l.add_theme_constant_override("outline_size", 12)
+	l.add_theme_constant_override("outline_size", 14)
 	l.size = Vector2(get_viewport_rect().size.x, 120)
-	l.position = Vector2(0, y)
+	l.position = Vector2(0, y + 16)
 	l.pivot_offset = l.size / 2
-	l.scale = Vector2(0.2, 0.2)
+	l.scale = Vector2(0.92, 0.92)
+	l.modulate.a = 0.0
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	l.z_index = 95
 	add_child(l)
 	var tw := l.create_tween()
-	tw.tween_property(l, "scale", Vector2(1.15, 1.15), 0.18).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	tw.tween_property(l, "scale", Vector2.ONE, 0.1)
-	tw.tween_interval(0.5)
+	tw.tween_property(l, "scale", Vector2.ONE, 0.25).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	tw.parallel().tween_property(l, "modulate:a", 1.0, 0.2)
+	tw.parallel().tween_property(l, "position:y", y, 0.25).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	tw.tween_interval(0.55)
 	tw.tween_property(l, "modulate:a", 0.0, 0.3)
 	tw.parallel().tween_property(l, "position:y", y - 60, 0.3)
 	tw.tween_callback(l.queue_free)

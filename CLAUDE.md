@@ -37,7 +37,8 @@ xvfb-run -a -s "-screen 0 800x1400x24" godot --path . --resolution 720x1280 --re
 - Language: the whole game, the event log and the docs are in English.
 - **Balance target:** bot win rate within `target.bot_win_rate_band` (15–22 %). Humans should land around 25 %. Use `sim/tune.gd` for sweeps. The spec's original values are in `config/presets/spec.json`.
 - No assets, names or fonts from other games. Fonts must be OFL and listed in `CREDITS.md`.
-- The web build has no system fonts: every non-ASCII character in UI text must exist in `Jersey10.ttf` or `SuitSymbols.ttf` (missing glyphs show as boxes with a hex code). System fallback is disabled so desktop screenshots show the same.
+- **Look:** illuminated manuscript (bardcore / Pre-Raphaelite): vellum, iron-gall ink, madder red, moss green, ochre gold. Low blue light: no saturated blues or pure white. All colours come from the palette in `ui/style.gd` (day and night variants; `Style.hex()` for bbcode), so never hardcode colours in screens. Effects stay gentle (soft fades, small shake).
+- The web build has no system fonts: every non-ASCII character in UI text must exist in `EBGaramond.ttf` / `UncialAntiqua.ttf` (both subset to Latin-1 plus general punctuation) or `SuitSymbols.ttf` (missing glyphs show as boxes with a hex code). System fallback is disabled so desktop screenshots show the same.
 
 ## Deploy
 - `.github/workflows/build.yml`: tests → web export → GitHub Pages (root = latest push, `/branch/<name>/` per branch) and a debug APK → release `build-<branch>`.

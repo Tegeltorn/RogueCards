@@ -25,9 +25,10 @@ static func write(path: String, data: Dictionary) -> void:
 
 static func settings() -> Dictionary:
 	var d := read(SETTINGS, {})
-	for k in {"crt": true, "sound": true, "force_theme": "", "force_mod": ""}.keys():
+	var defaults := {"crt": true, "sound": true, "night": false, "force_theme": "", "force_mod": ""}
+	for k in defaults.keys():
 		if not d.has(k):
-			d[k] = {"crt": true, "sound": true, "force_theme": "", "force_mod": ""}[k]
+			d[k] = defaults[k]
 	return d
 
 

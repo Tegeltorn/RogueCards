@@ -1,8 +1,10 @@
 # Credits
 
 ## Fonts
-- **Jersey 10** by The Soft Type Project Authors (https://github.com/scfried/soft-type-jersey).
-  Licensed under the SIL Open Font License 1.1. See `assets/fonts/OFL-Jersey10.txt`.
+- **EB Garamond** by The EB Garamond Project Authors (https://github.com/octaviopardo/EBGaramond12).
+  Licensed under the SIL Open Font License 1.1. See `assets/fonts/OFL-EBGaramond.txt`. Subset to Latin.
+- **Uncial Antiqua** by Astigmatic (AOETI).
+  Licensed under the SIL Open Font License 1.1. See `assets/fonts/OFL-UncialAntiqua.txt`. Subset to Latin.
 - **Noto Sans Symbols 2** (subset with card suit symbols, `assets/fonts/SuitSymbols.ttf`) by Google.
   Licensed under the SIL Open Font License 1.1. See `assets/fonts/OFL-NotoSansSymbols2.txt`.
 
@@ -12,7 +14,7 @@ Everything is made for this project:
 - The shaders are in `ui/fx/`.
 - The sounds are synthesized at runtime (`ui/sfx.gd`).
 
-There are no third-party graphics or sounds. The style is inspired by juicy card roguelikes but uses no assets, names or fonts from any other game.
+There are no third-party graphics or sounds. The style is inspired by medieval illuminated manuscripts and Pre-Raphaelite painting but uses no assets, names or fonts from any other game.
 
 ## Engine
 Built with [Godot Engine](https://godotengine.org) (MIT license).
