@@ -695,8 +695,16 @@ func _update_finish_tip() -> void:
 	_finish_tip.visible = show
 	if not show:
 		return
-	var cur: String = s.current[0].suit
-	var lines: Array = ["[color=%s]FINISH ON[/color]" % Style.hex(Style.GOLD)]
+	# The reward follows your last card that counts against this enemy card (the arrow follows the
+	# cards played and selected); with none yet, the enemy card's own suit.
+	var cards: Array = s.played.duplicate()
+	for id in _selected:
+		var sc = s.find_in(s.hand, id)
+		if sc != null:
+			cards.append(sc)
+	var by = _e.reward_card(cards)
+	var cur: String = by.suit if by != null else s.current[0].suit
+	var lines: Array = ["[color=%s]FINISH WITH[/color]" % Style.hex(Style.GOLD)]
 	for suit in ["S", "C", "H", "D"]:
 		var r: Dictionary = _e.reward_rules(suit)
 		var txt := ""

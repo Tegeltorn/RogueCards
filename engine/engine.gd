@@ -156,6 +156,7 @@ func _start_floor(f: int) -> void:
 	state.beaten = []
 	state.current = []
 	state.last_beaten = null
+	state.last_used = null
 	if f >= GameState.BOSS_FLOOR:
 		state.floor_num = GameState.BOSS_FLOOR
 		state.enemy_pile = _boss_pile.duplicate()
@@ -575,7 +576,7 @@ func _do_resolve() -> bool:
 				state.enemy_pile.append(e)
 				_emit(Ev.ATTACK_RETURNED, {"id": e.id, "card": e.label()})
 			else:
-				_beat(e)
+				_beat(e, _last_counting(state.played, t["block_cards"]))
 		state.carry_shield = new_carry
 		if new_carry > 0:
 			_emit(Ev.SHIELD_STORED, {"amount": new_carry})
@@ -593,7 +594,7 @@ func _do_resolve() -> bool:
 			if atk == aneed:
 				_perfect("attack")
 			for e in shields:
-				_beat(e)
+				_beat(e, _last_counting(state.played, t["attack_cards"]))
 		else:
 			var black_left := false
 			for e in state.enemy_pile:
@@ -609,7 +610,7 @@ func _do_resolve() -> bool:
 						_perfect("block")
 					state.carry_shield = mini(lblk - aneed, int(t["hearts"]))
 					for e in shields:
-						_beat(e)
+						_beat(e, _last_counting(state.played, t["block_cards"]))
 				else:
 					_emit(Ev.LOCKOUT, {"attack": atk, "shield": aneed, "block": lblk})
 					if _lose_lives(1, "lockout"):
@@ -675,10 +676,32 @@ func _perfect(kind: String) -> void:
 	_emit(Ev.PERFECT, {"kind": kind, "draw": n})
 
 
-func _beat(e) -> void:
+## `by`: the player card that beat it (the last card played that counted), null if none did.
+func _beat(e, by = null) -> void:
 	state.beaten.append(e)
 	state.last_beaten = e
+	state.last_used = by
 	_emit(Ev.ENEMY_DEFEATED, {"card": e.label(), "id": e.id, "suit": e.suit})
+
+
+## The last of `played` (in play order) that is in `counted` (the block or attack cards).
+static func _last_counting(played: Array, counted: Array):
+	for i in range(played.size() - 1, -1, -1):
+		if counted.has(played[i]):
+			return played[i]
+	return null
+
+
+## The card that would set the reward if `cards` beat the floor's final enemy card now:
+## the last one counting for the block (attack card) or the attack (shield card). Null if none.
+func reward_card(cards: Array):
+	if state.current.is_empty():
+		return null
+	var t := compute(cards)
+	var key := "block_cards"
+	if int(t["attack_need"]) > 0 and int(t["attack"]) >= int(t["attack_need"]):
+		key = "attack_cards"
+	return _last_counting(cards, t[key])
 
 
 ## Returns true if the run ended.
@@ -700,9 +723,12 @@ func _lose_lives(n: int, cause: String) -> bool:
 # ---------------------------------------------------------------- rewards
 
 func _floor_cleared() -> void:
-	var last = state.last_beaten
+	# The reward follows the last player card that counted against the final enemy card
+	# (falls back to that enemy card when nothing did, e.g. a stored shield or a lockout).
+	var last = state.last_used if state.last_used != null else state.last_beaten
 	_emit(Ev.FLOOR_CLEARED, {"floor": state.floor_num, "last": last.label() if last else "",
-		"suit": last.suit if last else ""})
+		"suit": last.suit if last else "",
+		"enemy": state.last_beaten.label() if state.last_beaten else ""})
 	if state.is_boss():
 		state.result = "win"
 		state.phase = Phase.WON

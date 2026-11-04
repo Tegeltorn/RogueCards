@@ -1,18 +1,64 @@
 extends "res://tests/test_base.gd"
-## Rewards decided by the suit of the last beaten enemy card.
+## Rewards decided by the suit of the player's last card that counted against the final enemy card.
 
 
-## Beat a single enemy card as the last card of floor 3 to trigger the reward.
+## Finish floor 3 with an ace of `last`'s suit: a red ace blocks an attack (3S), a black ace breaks a
+## shield (3H), so that ace sets the reward.
 func _clear_with(last: String, deck: Array, over: Dictionary = {}, beaten_before: Array = []) -> GameEngine:
-	var e := scenario([], [last], over)
+	var suit := last.right(1)
+	var red := suit in ["H", "D"]
+	var e := scenario([], ["3S" if red else "3H"], over)
 	var s := e.state
 	s.deck = cards(e, deck)
 	s.beaten = cards(e, beaten_before)
-	var red := last.right(1) in ["H", "D"]
-	s.hand = cards(e, ["14S" if red else "14H"])
+	s.hand = cards(e, ["14" + suit])
 	e.play_cards([s.hand[0].id])
 	e.resolve()
 	return e
+
+
+func _finish(hand: Array, enemy: String) -> GameEngine:
+	var e := scenario(hand, [enemy])
+	e.state.deck = cards(e, ["2H", "2D", "2S", "2C"])
+	e.play_cards(ids(e.state.hand))
+	e.resolve()
+	return e
+
+
+func test_reward_follows_last_counting_card() -> void:
+	eq(_finish(["5D", "6H"], "3S").state.reward.get("suit"), "H", "last red blocker")
+	eq(_finish(["6H", "5D"], "3S").state.reward.get("suit"), "D", "play order decides")
+	eq(_finish(["5H", "2C"], "3S").state.reward.get("suit"), "H", "a black card doesn't block")
+	eq(_finish(["9C", "4D"], "3H").state.reward.get("suit"), "C", "a red card doesn't break a shield")
+	eq(_finish(["2S", "9C"], "3H").state.reward.get("suit"), "C", "last black attacker")
+
+
+func test_reward_card_preview_matches() -> void:
+	var e := scenario(["5D", "6H", "2C"], ["3S"])
+	var h: Array = e.state.hand
+	eq(e.reward_card([h[0], h[1], h[2]]).suit, "H", "preview: last red")
+	eq(e.reward_card([h[2]]), null, "nothing counts yet")
+
+
+func test_reward_falls_back_to_enemy_suit() -> void:
+	var e := scenario([], ["3S"])
+	e.state.deck = cards(e, ["2H", "2D", "2S", "2C"])
+	e.state.carry_shield = 5
+	e.resolve()  # the stored shield blocks alone
+	eq(e.state.reward.get("suit"), "S", "enemy suit when no card counted")
+
+
+func test_sacrificed_ace_sets_reward() -> void:
+	var e := scenario(["2C"], ["3H"])
+	e.state.deck = cards(e, ["2H", "2D", "2S", "2C"])
+	var ace = null
+	for a in e.sacrificable_aces():
+		if a.base_black():
+			ace = a
+	check(ace != null, "two of the three life aces are never both red")
+	check(e.sacrifice_ace(ace.id), "sacrificed")
+	e.resolve()
+	eq(e.state.reward.get("suit"), ace.suit, "ace suit")
 
 
 func test_spade_reward_all_options() -> void:
@@ -36,9 +82,9 @@ func test_heart_reward_heals() -> void:
 	var e := _clear_with("3H", ["2H", "2D", "2S", "2C"], {}, ["3S"])
 	# full lives -> reveal 2 take 1
 	eq(e.state.phase, Phase.REWARD, "pick when lives full")
-	var e2 := scenario([], ["3H"])
+	var e2 := scenario([], ["3S"])
 	e2.state.lost_lives.append(e2.state.lives.pop_back())
-	e2.state.hand = cards(e2, ["14S"])
+	e2.state.hand = cards(e2, ["14H"])
 	e2.play_cards([e2.state.hand[0].id])
 	e2.resolve()
 	eq(e2.state.lives.size(), 3, "healed")

@@ -37,9 +37,9 @@ Black cards played against an attack don't block. **Overpower:** once per round,
 **Ace sacrifice:** while you have at least 2 lives you may sacrifice a life ace during a round. You lose that life, and the ace counts as a card worth 14 in its own colour for that round (red blocks, black attacks).
 
 ## Rewards (after every floor except the kings)
-The suit of the **last beaten enemy card** decides the reward. You choose among the floor's beaten cards.
+The suit of **your last card that counted** against the floor's final enemy card decides the reward: the last red card you played to block its attack, or the last black card you played to break its shield (a red card if you blocked a last stand's strike). A sacrificed ace counts with its own suit. If no card of yours counted (a stored ♥ shield blocked it alone, or you lost a life to a lockout), the enemy card's own suit decides. You choose among the floor's beaten cards.
 
-| Last card | Reward |
+| Finishing card | Reward |
 |---|---|
 | ♠ | Pick any of the beaten cards. |
 | ♣ | Reveal 2, take 1, and remove 1 card of your choice from your deck (choose both together). |

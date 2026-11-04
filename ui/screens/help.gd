@@ -132,7 +132,7 @@ Tip: select a single card to see what it does.
 %s  Your aces at the bottom. Tap them to see them, or to sacrifice one: you lose that life and it counts as %d this round.
 
 %s  A shield with no black enemy cards left behind it is a last stand: it strikes back with its value. Break it, or block the strike with red cards; otherwise you lose a life.
-%s  The suit of the last beaten card decides: ♠ pick any beaten card · ♣ reveal 2, take 1, remove 1 · ♥ heal a life · ♦ reveal 2, take both. %s
+%s  The suit of your last card that counted against the floor's final enemy card decides: ♠ pick any beaten card · ♣ reveal 2, take 1, remove 1 · ♥ heal a life · ♦ reveal 2, take both. %s
 %s  Floors go %d to Queen, then the three kings (%d cards in hand). Tap the king at the top to see your mod and the jokers (the red joker arrives after the Jack floor).""" % [
 		H % "EACH ROUND", Style.hex(Style.RED), Style.hex(Style.BLUE), int(b["hand_size"]),
 		H % "SUITS", str(b["spade_multiplier"]), int(b["club_pair_bonus"]),

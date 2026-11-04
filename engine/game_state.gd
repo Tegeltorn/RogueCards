@@ -31,6 +31,7 @@ var enemy_pile: Array = []  # front = next card
 var current: Array = []     # revealed enemy cards being fought
 var beaten: Array = []      # beaten enemy cards this floor (in order)
 var last_beaten = null
+var last_used = null        # Card: the player card that beat last_beaten (sets the reward), or null
 
 var carry_shield: int = 0   # stored ♥ overflow
 var overpowered := false    # overpower already triggered this round
