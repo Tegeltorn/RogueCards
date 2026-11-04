@@ -1,68 +1,28 @@
 extends "res://tests/test_base.gd"
-## Red/black jokers, mods, setup and determinism.
+## Floors, mods, setup and determinism.
 
 const Bot := preload("res://engine/bot.gd")
 
 
-func test_dual_card_plays_both_colours() -> void:
-	var e := scenario(["5S"], ["4S"])
-	e.state.hand[0].joker = "dual"
-	check(e.can_play_card(e.state.hand[0]), "dual black card blocks")
-
-
-func test_draw2_on_play() -> void:
-	var e := scenario(["5H"], ["4S"])
-	e.state.hand[0].joker = "draw2"
-	e.state.draw_pile = cards(e, ["2S", "3S"])
-	e.play_cards([e.state.hand[0].id])
-	eq(e.state.hand.size(), 2, "drew two")
-
-
-func test_innate_in_first_hand() -> void:
+func test_kings_floor_is_the_four_kings() -> void:
 	var e := scenario([], ["4S"])
-	var d := cards(e, ["2H", "2D", "2S", "2C", "9C"])
-	d[4].joker = "innate"
-	e.state.deck = d
-	e.state.balance["hand_size"] = 1
-	e._start_floor(4)
-	check(e.state.hand.has(d[4]), "innate card drawn first")
+	e.state.deck = cards(e, ["2H", "2D", "2S", "2C", "5C"])
+	e._start_floor(13)
+	var kings: Array = e.state.enemy_pile + e.state.current
+	eq(kings.size(), 4, "four kings")
+	for k in kings:
+		eq(k.rank, 13, "a king")
 
 
-func _boss(theme: String, pile: Array) -> GameEngine:
-	var e := scenario([], ["13S"], {}, {"force_theme": theme})
-	e.state.floor_num = 13
-	e.state.enemy_pile = cards(e, pile)
-	return e
-
-
-func test_black_joker_shield() -> void:
-	var e := _boss("D", ["0J", "13H"])
-	e.state.current = []
-	e._next_round()
-	eq(e.attack_need(), 14, "shield 14")
-
-
-func test_black_joker_attack() -> void:
-	var e := _boss("S", ["0J"])
-	e._next_round()
-	eq(e.block_need(), 14, "attack 14")
-
-
-func test_black_joker_double_reveal() -> void:
-	var e := _boss("C", ["0J", "13H", "13S"])
-	e._next_round()
-	eq(e.state.current.size(), 2, "two cards")
-	eq(e.block_need(), 13, "attack part")
-	eq(e.attack_need(), 13, "shield part")
-
-
-func test_black_joker_returns_king() -> void:
-	var e := _boss("H", ["0J", "13S"])
-	e.state.beaten = cards(e, ["13D"])
-	e._next_round()
-	eq(e.state.current[0].label(), "K♠", "next card revealed")
-	eq(e.state.enemy_pile.size(), 1, "king returned")
-	eq(e.state.enemy_pile[0].label(), "K♦", "beaten king back")
+func test_every_floor_has_four_cards() -> void:
+	var e := GameEngine.new()
+	e.start_run(3, Balance.make({"mods_enabled": false}), {})
+	while e.state.phase == Phase.SETUP_PICK:
+		e.setup_pick(e.state.setup_options[0].id)
+	e.ack_reveal()
+	for f in range(4, 14):
+		e._start_floor(f)
+		eq(e.state.enemy_pile.size() + e.state.current.size(), 4, "floor %d has 4 enemy cards" % f)
 
 
 func test_boss_hand_size() -> void:
@@ -73,8 +33,9 @@ func test_boss_hand_size() -> void:
 
 
 func test_win_after_boss() -> void:
-	var e := _boss("S", [])
-	e.state.current = cards(e, ["13S"])
+	var e := scenario([], ["13S"])
+	e.state.floor_num = 13
+	e.state.enemy_pile = []
 	e.state.hand = cards(e, ["14H"])
 	e.play_cards([e.state.hand[0].id])
 	e.resolve()
@@ -95,9 +56,9 @@ func test_foresight() -> void:
 
 
 func test_hardened() -> void:
-	var e := scenario([], ["12S"], {"mods_enabled": true, "ace_sac_own_color": false}, {"force_mod": "H"})
+	var e := scenario([], ["12S"], {"mods_enabled": true}, {"force_mod": "H"})
 	eq(e.sacrificable_aces().size(), 0, "no ace sacrifice")
-	eq(e.state.lives.size(), 4, "mod ace is a 4th life")
+	eq(e.state.lives.size(), 4, "mod ace is an extra life")
 
 
 func test_start_pick() -> void:
@@ -132,24 +93,13 @@ func test_spec_preset_starts_on_three() -> void:
 	eq(e.state.floor_num, 3, "spec starts on the threes")
 
 
-func test_setup_lives_and_theme() -> void:
+func test_setup_lives() -> void:
 	var e := GameEngine.new()
-	e.start_run(42, Balance.make({}), {})
-	eq(e.state.lives.size(), 3, "three lives")
+	e.start_run(42, Balance.make({"mods_enabled": false}), {})
+	eq(e.state.lives.size(), int(Balance.make()["lives"]), "lives from balance.json")
 	for a in e.state.lives:
 		check(a.suit != e.state.mod_suit, "mod ace is not a life")
 	eq(e.state.deck.size(), 4, "four twos before the pick")
-
-
-func test_short_floors() -> void:
-	var e := GameEngine.new()
-	e.start_run(3, Balance.make({"mods_enabled": false}), {})
-	while e.state.phase == Phase.SETUP_PICK:
-		e.setup_pick(e.state.setup_options[0].id)
-	e.ack_reveal()
-	eq(e.state.enemy_pile.size() + e.state.current.size(), 3, "floor 4 short")
-	e._start_floor(6)
-	eq(e.state.enemy_pile.size() + e.state.current.size(), 4, "floor 6 full")
 
 
 func test_determinism() -> void:
@@ -167,12 +117,17 @@ func test_determinism() -> void:
 
 
 func test_bot_runs_finish() -> void:
+	var stuck := 0
 	for sd in range(1, 200):
 		var e := GameEngine.new()
 		e.record_events = false
 		e.start_run(sd, Balance.make({}), {})
 		Bot.new().play_run(e)
-		check(e.state.result == "win" or e.state.result == "dead", "seed %d result %s" % [sd, e.state.result])
+		# "stuck": an unbreakable shield (a player would restart); it must stay rare.
+		check(["win", "dead", "stuck"].has(e.state.result), "seed %d result %s" % [sd, e.state.result])
+		if e.state.result == "stuck":
+			stuck += 1
+	check(stuck <= 12, "stuck runs are rare (%d of 199)" % stuck)
 
 
 func test_hardened_failed_attack_is_beaten() -> void:

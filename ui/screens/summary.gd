@@ -1,5 +1,6 @@
 extends Control
-## End of run: floor reached, lives left, theme king, mod ace, seed and final deck.
+## End of run: a comment on how close it was and the best run so far, then floor reached,
+## lives left, mod ace, seed and final deck.
 
 const Style := preload("res://ui/style.gd")
 const CardView := preload("res://ui/card_view.gd")
@@ -22,10 +23,13 @@ func enter() -> void:
 	var t := Style.label("VICTORY!" if won else "DEFEAT", 88, Style.GOLD if won else Style.RED)
 	t.add_theme_constant_override("outline_size", 10)
 	v.add_child(t)
+	for line in comments(s, main.last_record):
+		var c := Style.label(line, 30, Style.GOLD if won else Style.WHITE)
+		c.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		v.add_child(c)
 	var rows := [
 		["Floor", "King (won)" if won else Style.floor_text(s.floor_num)],
 		["Lives left", str(s.lives.size())],
-		["Theme king", Style.SUIT_SYM[s.theme_suit] + " " + Style.SUIT_NAME[s.theme_suit]],
 		["Mod ace", Style.SUIT_SYM[s.mod_suit] + " " + _mod_name()],
 		["Seed", str(s.seed_value)],
 	]
@@ -75,6 +79,33 @@ func enter() -> void:
 	menu.pressed.connect(func(): main.quit_to_menu())
 	h.add_child(menu)
 	v.add_child(h)
+
+
+## "floor 9" / "the Queen floor".
+static func floor_phrase(f: int) -> String:
+	return "the %s floor" % {11: "Jack", 12: "Queen", 13: "King"}[f] if f >= 11 else "floor %d" % f
+
+
+## End-of-run comments: how close a loss came, and the run against the best one so far.
+## `rec` is Store.record_run()'s result ({prev_best, best}); empty when it wasn't recorded.
+static func comments(s, rec: Dictionary) -> Array:
+	var out: Array = []
+	var won: bool = s.result == "win"
+	if not won:
+		# Enemy cards still to beat: the rest of this floor plus four on every floor after it.
+		var left: int = s.enemy_pile.size() + s.current.size() + 4 * (13 - int(s.floor_num))
+		if s.floor_num == 13:
+			out.append("So close! Only %d %s left to beat." % [left, "king" if left == 1 else "kings"])
+		else:
+			out.append("%d enemy cards from victory." % left)
+	if not rec.is_empty():
+		var prog: int = 14 if won else int(s.floor_num)
+		var prev: int = int(rec.get("prev_best", 0))
+		if prev > 0 and prog > prev:
+			out.append("New best! " + ("Your first win." if won and prev < 14 else "Furthest you have ever come."))
+		elif prev > 0 and not won:
+			out.append("Best so far: " + ("a win" if prev >= 14 else floor_phrase(prev)) + ".")
+	return out
 
 
 func _mod_name() -> String:

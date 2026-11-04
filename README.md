@@ -10,8 +10,8 @@ A solo roguelike deckbuilder played with a standard 54-card deck. This repo is a
 CI builds, tests and deploys on every push (`.github/workflows/build.yml`). You don't need a computer.
 
 ## Balance
-Every number lives in [`config/balance.json`](config/balance.json). Mods are in `config/mods.json`, jokers in `config/jokers.json`. The spec's original values are kept in `config/presets/spec.json`.
-In the game: long-press the title to open the debug menu. There you can edit balance values (they apply from the next run), force a theme king or mod ace, jump to a floor, or give a life.
+Every number lives in [`config/balance.json`](config/balance.json). Mods are in `config/mods.json`. The spec's original values are kept in `config/presets/spec.json`.
+In the game: long-press the title to open the debug menu. There you can edit balance values (they apply from the next run), force a mod ace, jump to a floor, or give a life.
 
 ## Simulation
 ```

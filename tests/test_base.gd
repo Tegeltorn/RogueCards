@@ -22,10 +22,11 @@ func eq(actual, expected, msg: String = "") -> void:
 		failures.append("%s: %s expected %s, got %s" % [current_test, msg, str(expected), str(actual)])
 
 
-## Engine started on floor 3 with mods off (unless given) and a scripted round.
+## Engine started with mods off (unless given) and a scripted round. The tests pin a few values
+## (3 lives, overpower draws 1, deck minimum 4) so they don't move with balance tuning.
 ## Card specs are strings like "7S", "12H", "2D".
 func scenario(hand: Array, enemies: Array, over: Dictionary = {}, opts: Dictionary = {}) -> GameEngine:
-	var b := {"mods_enabled": false}
+	var b := {"mods_enabled": false, "lives": 3, "overpower_draw": 1, "deck_min": 4}
 	for k in over:
 		b[k] = over[k]
 	var e := GameEngine.new()

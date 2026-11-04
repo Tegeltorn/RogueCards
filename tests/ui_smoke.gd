@@ -9,6 +9,7 @@ const SimLib := preload("res://sim/sim_lib.gd")
 var _shots := ""
 var _shot_n := 0
 var _seen: Dictionary = {}
+var _burned := false
 
 
 func _init() -> void:
@@ -41,7 +42,7 @@ func _run() -> void:
 			if r == 0 and main.screen_name == "reward":
 				await _reward_via_ui(main)
 			elif r == 0 and main.screen_name == "combat" and main.engine.state.phase == main.Phase.PLAY:
-				_fight_via_ui(main)
+				await _fight_via_ui(main)
 			else:
 				main.act(func(): bot.step(main.engine))
 			await _wait(main)
@@ -162,6 +163,11 @@ func _fight_via_ui(main) -> void:
 	var t: Dictionary = e.compute(e.state.played)
 	var short: bool = int(t["block"]) < int(t["block_need"]) or int(t["attack"]) < int(t["attack_need"])
 	var cards: Array = e.playable_cards()
+	# Once per smoke test: burn a card on the fire as soon as burning is allowed.
+	if short and not _burned and e.can_burn() and scr._hand_views.has(e.state.hand[0].id):
+		_burned = true
+		await _burn_via_ui(main, e.state.hand[0].id)
+		return
 	if short and not cards.is_empty() and scr._hand_views.has(cards[0].id):
 		var cv = scr._hand_views[cards[0].id]
 		var drop: Vector2 = scr._drop_zone().get_center()
@@ -170,3 +176,19 @@ func _fight_via_ui(main) -> void:
 		scr._on_drag_released(cv, drop)
 		return
 	scr._on_main()
+
+
+## Drags a hand card onto the fire like a player; it must burn.
+func _burn_via_ui(main, id: int) -> void:
+	var scr = main.screen
+	var e = main.engine
+	var cv = scr._hand_views[id]
+	var fire: Vector2 = scr._fire.get_global_rect().get_center()
+	scr._on_drag_started(cv)
+	scr._on_drag_moved(cv, fire)
+	await _shot(main, "combat_burn_hover")
+	scr._on_drag_released(cv, fire)
+	if not e.state.played.any(func(c): return c.burned):
+		push_error("dropping a card on the fire did not burn it")
+	await _wait(main)
+	await _shot(main, "combat_burned")

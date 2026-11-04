@@ -1,5 +1,5 @@
 extends "res://tests/test_base.gd"
-## Damage, suit effects, shield fights, lockout, ace sacrifice.
+## Damage, suit effects, shield fights, ace sacrifice, burning.
 
 
 func test_block_exact_no_damage() -> void:
@@ -83,12 +83,16 @@ func test_shield_fail_goes_to_bottom() -> void:
 	eq(e.state.lives.size(), 3, "no life lost")
 
 
-func test_lockout() -> void:
-	var e := scenario(["2S"], ["9H"], {}, {"pile": ["6H"]})
+func test_last_shield_unbroken_comes_back_without_damage() -> void:
+	# No black cards left behind it: the shield still just goes to the bottom (no last stand).
+	var e := scenario(["2S", "9H"], ["9H"], {}, {"pile": ["6H"]})
+	check(not e.is_effective(e.state.hand[1]), "red cards don't count against a shield")
 	e.play_cards([e.state.hand[0].id])
 	e.resolve()
-	check(has_event(e, Ev.LOCKOUT), "lockout")
-	eq(e.state.lives.size(), 2, "lost one life")
+	check(has_event(e, Ev.ATTACK_FAILED), "the shield holds")
+	eq(e.state.lives.size(), 3, "no life lost")
+	eq(e.state.enemy_pile.size(), 1, "it is back in the pile behind 6♥")
+	eq(e.state.enemy_pile[-1].label(), "9♥", "at the bottom")
 
 
 func test_heart_carry_next_round_only() -> void:
@@ -137,9 +141,9 @@ func test_draw_reshuffles_discard() -> void:
 
 
 func test_ace_sacrifice() -> void:
-	var e := scenario(["2H"], ["12S"], {"ace_sac_own_color": false}, {"pile": ["5S"]})
+	var e := scenario(["2H"], ["12S"], {}, {"pile": ["5S"], "force_mod": "S"})
 	var aces := e.sacrificable_aces()
-	check(aces.size() == 3, "all aces usable")
+	eq(aces.size(), 2, "the two red aces can block")
 	e.play_cards([e.state.hand[0].id])
 	e.sacrifice_ace(aces[0].id)
 	eq(e.state.lives.size(), 2, "life spent")
@@ -149,13 +153,13 @@ func test_ace_sacrifice() -> void:
 
 
 func test_ace_sacrifice_own_colour() -> void:
-	var e := scenario([], ["12S"], {"ace_sac_own_color": true}, {"force_mod": "H"})
+	var e := scenario([], ["12S"], {}, {"force_mod": "H"})
 	for a in e.sacrificable_aces():
 		check(a.base_red(), "only red aces can block")
 
 
 func test_ace_sacrifice_needs_two_lives() -> void:
-	var e := scenario([], ["12S"], {"lives": 1, "ace_sac_own_color": false})
+	var e := scenario([], ["12S"], {"lives": 1})
 	eq(e.sacrificable_aces().size(), 0, "cannot sacrifice last life")
 
 
@@ -175,13 +179,6 @@ func test_no_retain_when_floor_cleared() -> void:
 	e.play_cards([e.state.hand[0].id])
 	e.resolve()
 	check(e.state.phase != Phase.RETAIN, "no keep step after the last enemy card")
-
-
-func test_lockout_risk() -> void:
-	var e := scenario(["2S"], ["9H"], {}, {"pile": ["6H"]})
-	check(e.lockout_risk(), "shield with only red cards left")
-	var f := scenario(["2S"], ["9H"], {}, {"pile": ["6S"]})
-	check(not f.lockout_risk(), "a black card is still in the pile")
 
 
 func test_overpower_discards_and_draws() -> void:
@@ -272,20 +269,58 @@ func test_perfect_hit_draws_extra_next_hand() -> void:
 	eq(e.state.hand.size(), 3, "3♠ kept + fill to 2 + 1 extra")
 
 
-func test_last_stand_can_be_blocked() -> void:
-	var e := scenario(["9H", "2S"], ["8D"], {}, {"pile": ["6H"]})
-	check(e.lockout_risk(), "last stand")
-	check(e.is_effective(e.state.hand[0]), "red counts at a last stand")
-	e.play_cards([e.state.hand[0].id])
+func test_burn_double_counts_twice_its_rank() -> void:
+	var e := scenario(["7H", "3S"], ["12S"], {"burn_mode": "double", "burn_limit": 1}, {"pile": ["5S"]})
+	e.state.deck += cards(e, ["2C", "2D", "2H", "2S"])  # deck above the minimum
+	var h = e.state.hand[0]
+	check(e.burn_card(h.id), "burn 7♥")
+	check(not e.state.deck.has(h), "gone from the deck")
+	check(has_event(e, Ev.CARD_BURNED), "burn event")
+	eq(int(e.compute(e.state.played)["block"]), 14, "7♥ burned blocks 14")
 	e.resolve()
-	check(has_event(e, Ev.LAST_STAND_BLOCKED), "strike blocked")
-	eq(e.state.lives.size(), 3, "no life lost")
-	check(not has_event(e, Ev.LOCKOUT), "no lockout")
+	check(has_event(e, Ev.BLOCKED), "14 blocks 12")
+	check(not e.state.discard.has(h), "not in the discard pile")
+	check(not e.state.draw_pile.has(h), "not in the draw pile")
 
 
-func test_last_stand_unblocked_costs_a_life() -> void:
-	var e := scenario(["3H"], ["8D"], {}, {"pile": ["6H"]})
-	e.play_cards([e.state.hand[0].id])
+func test_burn_has_no_suit_effects() -> void:
+	var e := scenario(["5S", "4D", "6H"], ["9H"], {"burn_mode": "double", "burn_limit": 0}, {"pile": ["5S"]})
+	e.state.deck += cards(e, ["2C", "2D", "2H", "2S"])
+	e.state.draw_pile = cards(e, ["8C"])
+	e.burn_card(e.state.hand[0].id)  # 5♠ burned: 10, not 15
+	eq(int(e.compute(e.state.played)["attack"]), 10, "no ♠ × 1.5")
+	e.burn_card(e.state.hand[0].id)  # 4♦ burned: no draw
+	eq(e.state.hand.size(), 1, "♦ burned draws nothing")
+	e.burn_card(e.state.hand[0].id)  # 6♥ burned against a shield: no stored shield
 	e.resolve()
-	check(has_event(e, Ev.LOCKOUT), "lockout")
-	eq(e.state.lives.size(), 2, "one life lost")
+	eq(e.state.carry_shield, 0, "♥ burned stores no shield")
+
+
+func test_burn_swap_counts_as_other_colour() -> void:
+	var e := scenario(["8H"], ["9D"], {"burn_mode": "swap"}, {"pile": ["5S"]})
+	e.state.deck += cards(e, ["2C", "2D", "2H", "2S"])
+	e.burn_card(e.state.hand[0].id)
+	var t := e.compute(e.state.played)
+	eq(int(t["attack"]), 8, "8♥ burned attacks 8")
+	eq(int(t["block"]), 0, "and doesn't block")
+
+
+func test_burn_limits() -> void:
+	var e := scenario(["2S", "3S", "4S"], ["9H"], {"burn_mode": "double", "burn_limit": 1, "deck_min": 4}, {"pile": ["5S"]})
+	e.state.deck += cards(e, ["2C", "2D"])  # 5 cards
+	check(e.burn_card(e.state.hand[0].id), "first burn")
+	check(not e.burn_card(e.state.hand[0].id), "once per round")
+	var f := scenario(["2S", "3S"], ["9H"], {"burn_mode": "double", "burn_limit": 0, "deck_min": 4}, {"pile": ["5S"]})
+	f.state.deck += cards(f, ["2C", "2D"])  # 4 cards: at the minimum
+	check(not f.can_burn(), "the deck never shrinks below deck_min")
+	var g := scenario(["2S"], ["9H"], {"burn_mode": "off"}, {"pile": ["5S"]})
+	g.state.deck += cards(g, ["2C", "2D", "2H", "2S"])
+	check(not g.burn_card(g.state.hand[0].id), "burning off")
+
+
+func test_burned_card_sets_the_reward() -> void:
+	var e := scenario(["5H"], ["6S"], {"burn_mode": "double"})
+	e.state.deck += cards(e, ["2C", "2D", "2H", "2S"])
+	e.burn_card(e.state.hand[0].id)
+	e.resolve()
+	eq(e.state.reward.get("suit", ""), "H", "the burned 5♥ finished the floor")

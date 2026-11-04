@@ -1,5 +1,5 @@
 extends RefCounted
-## Local play statistics: runs, win rate vs target, losses per floor, per theme king and mod ace.
+## Local play statistics: runs, win rate vs target, best run, losses per floor, per mod ace.
 
 const Style := preload("res://ui/style.gd")
 const Store := preload("res://ui/store.gd")
@@ -14,13 +14,16 @@ func build(main) -> Control:
 	var lines: Array = []
 	lines.append("[b]Runs:[/b] %d   [b]Wins:[/b] %d (%s)" % [runs, wins, _pct(wins, runs)])
 	lines.append("Target for human players: ~%d %%" % int(target))
+	var best := int(d.get("best", 0))
+	if best > 0:
+		lines.append("[b]Best run:[/b] " + ("won" if best >= 14 else "reached " + preload("res://ui/screens/summary.gd").floor_phrase(best)))
 	lines.append("")
 	lines.append("[b]Losses per floor[/b]")
 	for f in range(3, 14):
 		var n := int(d["loss_floor"].get(str(f), 0))
 		if n > 0:
 			lines.append("  %s: %d  %s" % [Style.floor_text(f), n, "|".repeat(mini(n, 30))])
-	for pair in [["theme", "Per theme king"], ["mod", "Per mod ace"]]:
+	for pair in [["mod", "Per mod ace"]]:
 		lines.append("")
 		lines.append("[b]%s[/b]" % pair[1])
 		for s in SUITS:

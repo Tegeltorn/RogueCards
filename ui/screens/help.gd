@@ -1,17 +1,10 @@
 extends RefCounted
 ## Help texts and info overlays: short rules ("?"), card effect tooltip text,
-## the aces overlay (lives + sacrifice) and the modifiers overlay (mod ace + theme king).
+## the aces overlay (lives + sacrifice) and the modifiers overlay (mod ace).
 
 const Style := preload("res://ui/style.gd")
 const CardView := preload("res://ui/card_view.gd")
 const Balance := preload("res://engine/balance.gd")
-
-const JOKER_TEXT := {
-	"dual": "Joker: counts as both colours.",
-	"innate": "Joker: always in your first hand of a floor.",
-	"double": "Joker: worth double.",
-	"draw2": "Joker: draw 2 cards when played.",
-}
 
 
 ## Everything a card does, without fight context (reward and start-pick screens).
@@ -28,10 +21,27 @@ static func card_info(b: Dictionary, c) -> String:
 		"C":
 			lines.append("Attack %d. +%d if you play 2 or more clubs in a round." % [v, int(b["club_pair_bonus"])])
 	if c.suit == "S" or c.suit == "C":
-		lines.append("Against an attack it doesn't block, but counts toward overpower (%d× the attack: discard, draw 1)." % int(b.get("overpower_multiplier", 2)))
-	if c.joker != "":
-		lines.append(JOKER_TEXT.get(c.joker, ""))
+		lines.append("Against an attack it doesn't block, but counts toward overpower (%d× the attack: %s)." % [int(b.get("overpower_multiplier", 2)), _overpower_effect(b)])
+	var burn := burn_text(b, c)
+	if burn != "":
+		lines.append(burn)
 	return "\n".join(lines)
+
+
+## What overpowering does with the current balance.
+static func _overpower_effect(b: Dictionary) -> String:
+	var n := int(b.get("overpower_draw", 0))
+	return "discard them" + (", draw %d" % n if n > 0 else "")
+
+
+## What burning this card would do ("" when burning is off).
+static func burn_text(b: Dictionary, c) -> String:
+	match str(b.get("burn_mode", "off")):
+		"double":
+			return "Burn: %s %d this round, then it is gone for good." % ["blocks" if c.base_red() else "attacks", c.rank * 2]
+		"swap":
+			return "Burn: %s %d this round, then it is gone for good." % ["attacks" if c.base_red() else "blocks", c.rank]
+	return ""
 
 
 ## A tooltip box (panel + label) for screens that list cards.
@@ -68,8 +78,6 @@ static func card_effect(e, c) -> String:
 			lines.append("Attack %d (%d × %s, rounded down)." % [int(floor(v * float(b["spade_multiplier"]))), v, str(b["spade_multiplier"])])
 		"C":
 			lines.append("Attack %d. +%d if you play 2 or more clubs this round." % [v, int(b["club_pair_bonus"])])
-	if c.joker != "":
-		lines.append(JOKER_TEXT.get(c.joker, ""))
 	var bneed: int = e.block_need()
 	var aneed: int = e.attack_need()
 	if not e.is_effective(c):
@@ -78,7 +86,10 @@ static func card_effect(e, c) -> String:
 		elif c.suit == "D":
 			lines.append("No attack to block: it only draws a card.")
 		elif bneed > 0 and aneed == 0:
-			lines.append("No shield to break. Black cards worth %d× the attack overpower: discarded, draw 1." % int(b.get("overpower_multiplier", 2)))
+			lines.append("No shield to break. Black cards worth %d× the attack overpower: %s." % [int(b.get("overpower_multiplier", 2)), _overpower_effect(b)])
+	var burn := burn_text(b, c)
+	if burn != "" and e.can_burn(c):
+		lines.append(burn)
 	return "\n".join(lines)
 
 
@@ -113,38 +124,36 @@ static func _text(bb: String, size: int = 24) -> RichTextLabel:
 static func rules_overlay(main) -> Control:
 	var b: Dictionary = main.engine.state.balance if main.engine != null else main.balance()
 	var H := "[color=" + Style.hex(Style.GOLD) + "]%s[/color]"
-	var txt := """%s  An enemy card is revealed. [color=%s]Black = attack[/color], [color=%s]red = shield[/color]. Its value is its rank.
-• Your hand is filled up to %d cards. Cards you don't play stay in your hand.
-• Drag a card onto the enemy to play it. Its effect happens at once (♦ draws a card). Only the right colour counts (green outline): red cards block attacks, black cards break shields. Tap a card to see what it does.
-• Press End turn: the enemy acts and the round is resolved.
-
-%s
-♥ Block. Leftover block is stored as shield for the next round (with no attack: the full value).
-♦ Block and draw 1 card (also against a shield).
-♠ Attack × %s (rounded down).
-♣ Attack. +%d if you play 2 or more clubs.
-Tip: select a single card to see what it does.
-
-%s  If your block is too low you lose a life (a miss of %d or more costs 2). %s
-%s  Block exactly the attack, or break a shield with exactly its value: draw %d extra card in your next hand.
-%s  Once per round, black cards played against an attack worth %d× its value: they are discarded and you draw 1 card. The enemy still attacks at End turn.
-%s  Break it with enough attack, or it goes to the bottom of the enemy pile and comes back.
-%s  Your aces at the bottom. Tap them to see them, or to sacrifice one: you lose that life and it counts as %d this round.
-
-%s  A shield with no black enemy cards left behind it is a last stand: it strikes back with its value. Break it, or block the strike with red cards; otherwise you lose a life.
-%s  The suit of your last card that counted against the floor's final enemy card decides: ♠ pick any beaten card · ♣ reveal 2, take 1, remove 1 · ♥ heal a life · ♦ reveal 2, take both. %s
-%s  Floors go %d to Queen, then the three kings (%d cards in hand). Tap the king at the top to see your mod and the jokers (the red joker arrives after the Jack floor).""" % [
-		H % "EACH ROUND", Style.hex(Style.RED), Style.hex(Style.BLUE), int(b["hand_size"]),
-		H % "SUITS", str(b["spade_multiplier"]), int(b["club_pair_bonus"]),
-		H % "ATTACK", int(b["graded_threshold"]),
-		("An attack you don't block goes to the bottom of the enemy pile and comes back: sacrificing an ace to block it can be worth it." if bool(b.get("failed_attack_returns", false)) else "The attack card is beaten either way."),
-		H % "PERFECT", int(b.get("perfect_draw", 1)),
-		H % "OVERPOWER", int(b.get("overpower_multiplier", 2)),
-		H % "SHIELD",
-		H % "LIVES", int(b["ace_value"]),
-		H % "LAST STAND",
-		H % "REWARDS", ("You may decline any card to keep your deck lean." if int(b["deck_cap"]) <= 0 else "Your deck holds up to %d cards; when it is full you swap or decline." % int(b["deck_cap"])),
-		H % "THE ROAD", int(b.get("first_floor", 4)), int(b["boss_hand_size"])]
+	var lines: Array = []
+	lines.append("%s  An enemy card is revealed. [color=%s]Black = attack[/color], [color=%s]red = shield[/color]. Its value is its rank." % [H % "EACH ROUND", Style.hex(Style.RED), Style.hex(Style.BLUE)])
+	lines.append("• Your hand is filled up to %d cards. Cards you don't play stay in your hand." % int(b["hand_size"]))
+	lines.append("• Drag a card onto the enemy to play it. Its effect happens at once (♦ draws a card). Only the right colour counts (green outline): red cards block attacks, black cards break shields. Tap a card to see what it does.")
+	lines.append("• Press End turn: the enemy acts and the round is resolved.")
+	lines.append("")
+	lines.append(H % "SUITS")
+	lines.append("♥ Block. Leftover block is stored as shield for the next round (with no attack: the full value).")
+	lines.append("♦ Block and draw 1 card (also against a shield).")
+	lines.append("♠ Attack × %s (rounded down)." % str(b["spade_multiplier"]))
+	lines.append("♣ Attack. +%d if you play 2 or more clubs." % int(b["club_pair_bonus"]))
+	lines.append("")
+	lines.append("%s  If your block is too low you lose a life (a miss of %d or more costs 2). %s" % [H % "ATTACK", int(b["graded_threshold"]),
+		("An attack you don't block goes to the bottom of the enemy pile and comes back: sacrificing an ace to block it can be worth it." if bool(b.get("failed_attack_returns", false)) else "The attack card is beaten either way.")])
+	lines.append("%s  Break it with enough attack, or it goes to the bottom of the enemy pile and comes back. Cards that can't break it still cycle your hand: play them to draw fresh ones next round." % (H % "SHIELD"))
+	match str(b.get("burn_mode", "off")):
+		"double":
+			lines.append("%s  Drag a card onto the fire: it burns up and leaves your deck for good. This round it counts double its rank in its own colour (no suit effect). %s" % [H % "BURN", _burn_limits(b)])
+		"swap":
+			lines.append("%s  Drag a card onto the fire: it burns up and leaves your deck for good. This round it counts its rank in the other colour (no suit effect). %s" % [H % "BURN", _burn_limits(b)])
+	if int(b.get("perfect_draw", 0)) > 0:
+		lines.append("%s  Block exactly the attack, or break a shield with exactly its value: draw %d extra card in your next hand." % [H % "PERFECT", int(b["perfect_draw"])])
+	if int(b.get("overpower_multiplier", 0)) > 0:
+		lines.append("%s  Once per round, black cards played against an attack worth %d× its value: %s. The enemy still attacks at End turn." % [H % "OVERPOWER", int(b["overpower_multiplier"]), _overpower_effect(b)])
+	lines.append("%s  Your aces at the bottom. Tap them to see them, or to sacrifice one: you lose that life and it counts as %d this round." % [H % "LIVES", int(b["ace_value"])])
+	lines.append("")
+	lines.append("%s  The suit of your last card that counted against the floor's final enemy card decides: ♠ pick any beaten card · ♣ reveal 2, take 1, remove 1 · ♥ heal a life · ♦ reveal 2, take both. %s" % [H % "REWARDS",
+		("You may decline any card to keep your deck lean." if int(b["deck_cap"]) <= 0 else "Your deck holds up to %d cards; when it is full you swap or decline." % int(b["deck_cap"]))])
+	lines.append("%s  Every floor has 4 enemy cards: %d up to Queen, then the four kings (%d cards in hand). Tap the ace at the top to see your mod." % [H % "THE ROAD", int(b.get("first_floor", 4)), int(b["boss_hand_size"])])
+	var txt := "\n".join(lines)
 	var v := VBoxContainer.new()
 	var scroll := ScrollContainer.new()
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -153,6 +162,12 @@ Tip: select a single card to see what it does.
 	scroll.add_child(rt)
 	v.add_child(scroll)
 	return _panel_with_close(v, "How to play")
+
+
+static func _burn_limits(b: Dictionary) -> String:
+	var lim := int(b.get("burn_limit", 0))
+	return ("Once per round. " if lim == 1 else ("Up to %d per round. " % lim if lim > 1 else "")) \
+		+ "Your deck never goes below %d cards." % int(b["deck_min"])
 
 
 ## Lives overlay: remaining and lost aces, and the sacrifice buttons.
@@ -201,11 +216,10 @@ static func aces_overlay(main) -> Control:
 	return holder[0]
 
 
-## Modifiers overlay: the mod ace and the theme king's jokers.
+## Modifiers overlay: the mod ace.
 static func mods_overlay(main) -> Control:
 	var e = main.engine
 	var s = e.state
-	var jd: Dictionary = Balance.jokers().get(s.theme_suit, {})
 	var v := VBoxContainer.new()
 	var mod_row := HBoxContainer.new()
 	var mv := CardView.new()
@@ -216,22 +230,4 @@ static func mods_overlay(main) -> Control:
 	var mt := "[b]Mod ace: %s[/b]\n%s" % [e.mod.name, e.mod.desc] if s.balance["mods_enabled"] else "[b]Mod ace[/b]\nMods are disabled."
 	mod_row.add_child(_text(mt, 24))
 	v.add_child(mod_row)
-	var king_row := HBoxContainer.new()
-	var kv := CardView.new()
-	kv.set_interactive(false)
-	kv.breathing = false
-	kv.setup(s.theme_king, Vector2(90, 126))
-	king_row.add_child(kv)
-	var kt := "[b]Theme king: %s[/b]\n" % Style.SUIT_NAME.get(s.theme_suit, "")
-	if s.balance["jokers_enabled"]:
-		var red_state := "Comes after the Jack floor."
-		for c in s.deck:
-			if c.joker != "":
-				red_state = "Attached under %s." % c.label()
-		kt += "[color=" + Style.hex(Style.RED) + "]Red joker:[/color] %s %s\n" % [jd.get("red", {}).get("desc", ""), red_state]
-		kt += "[b]Black joker[/b] (in the boss pile): %s" % jd.get("black", {}).get("desc", "")
-	else:
-		kt += "Jokers are disabled."
-	king_row.add_child(_text(kt, 24))
-	v.add_child(king_row)
-	return _panel_with_close(v, "Modifiers")
+	return _panel_with_close(v, "Modifier")

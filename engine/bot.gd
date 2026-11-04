@@ -4,10 +4,12 @@ extends RefCounted
 ## - keeps the highest unplayed card
 ## - reward: colour the deck has the least of, then highest rank; swaps out the lowest same-colour card
 ## - sacrifices an ace only when blocking and a miss would cost 2 lives
-## - attaches the red joker to its highest card
+## - burns a card only when that is the only way to beat the enemy card (or to soften a big miss)
 
 const GameState := preload("res://engine/game_state.gd")
 const EXACT_BONUS := 25  # cost units (10 per card value point) a perfect hit is worth to the bot
+const BURN_COST := 30    # extra cost units for burning a card (it leaves the deck for good)
+const STUCK_ROUNDS := 80  # a floor this long means the run is stuck (an unbreakable shield): give up
 const Phase := GameState.Phase
 
 
@@ -30,14 +32,6 @@ func step(e) -> bool:
 			_reward(e)
 		Phase.REWARD_REMOVE:
 			e.reward_remove(_lowest(s.deck).id)
-		Phase.JOKER_ATTACH:
-			var best = null
-			for c in s.deck:
-				if c.joker == "" and (best == null or c.value() > best.value()):
-					best = c
-			if best == null:
-				best = s.deck[0]
-			e.attach_joker(best.id)
 		_:
 			return false
 	return true
@@ -47,7 +41,10 @@ func play_run(e) -> void:
 	var guard := 0
 	while step(e):
 		guard += 1
-		if guard > 5000:
+		if e.state.floor_round > STUCK_ROUNDS:
+			e.state.result = "stuck"  # a player would restart here
+			return
+		if guard > 20000:
 			push_warning("bot: run did not terminate, seed %d" % e.state.seed_value)
 			e.state.result = "loop"
 			return
@@ -61,7 +58,8 @@ func _play(e) -> void:
 
 
 ## Cards stay in hand between rounds: play the cheapest set that does the job, ♦ first (they draw),
-## save the rest. If the enemy can't be stopped, only play enough to avoid the 2-life miss.
+## save the rest. Burn a card only when nothing else does the job. If the enemy can't be stopped,
+## only play enough to avoid the 2-life miss.
 func _play_thrifty(e) -> void:
 	var s = e.state
 	var graded := int(s.balance["graded_threshold"])
@@ -70,16 +68,13 @@ func _play_thrifty(e) -> void:
 		var aneed: int = e.attack_need()
 		var t: Dictionary = e.compute(s.played)
 		var short_block: bool = bneed > 0 and int(t["block"]) < bneed
-		# At a last stand, blocking the shield's strike is as good as breaking it.
-		var stand_blocked: bool = e.lockout_risk() and bneed == 0 and int(t["block"]) >= aneed
-		var short_atk: bool = aneed > 0 and int(t["attack"]) < aneed and not stand_blocked
+		var short_atk: bool = aneed > 0 and int(t["attack"]) < aneed
 		if not short_block and not short_atk:
 			break
-		var cards: Array = e.playable_cards()
-		var best := _cheapest_set(e, cards, true)
-		if best.is_empty():
+		var plan := _cheapest_plan(e, true, 0)
+		if plan.is_empty():
 			# Can't make it with this hand: try to dig for better cards first.
-			var blacks: Array = s.hand.filter(func(c): return c.is_black() and not c.is_red())
+			var blacks: Array = s.hand.filter(func(c): return c.is_black())
 			if short_block and not s.overpowered and e.overpower_value(s.played + blacks) > 0:
 				e.play_cards(_ids(blacks))  # overpower: unclog the black cards, draw 1
 				continue
@@ -87,18 +82,29 @@ func _play_thrifty(e) -> void:
 			if not dias.is_empty():
 				e.play_cards([dias[0].id])  # ♦ always draws
 				continue
-			if short_block:
-				best = _cheapest_set(e, cards, false)
-		if best.is_empty():
+			plan = _cheapest_plan(e, true, _burns_left(e))
+			if plan.is_empty() and short_block:
+				plan = _cheapest_plan(e, false, _burns_left(e))
+		if plan.is_empty():
 			break
-		var drawers: Array = best.filter(func(c): return c.suit == "D" or c.joker == "draw2")
-		if not drawers.is_empty() and best.size() > 1:
+		var play: Array = plan["play"]
+		var burn: Array = plan["burn"]
+		var drawers: Array = play.filter(func(c): return c.suit == "D")
+		if not drawers.is_empty() and play.size() + burn.size() > 1:
 			e.play_cards([drawers[0].id])  # draw first, then re-plan with the new card
 			continue
-		e.play_cards(_ids(best))
+		for c in burn:
+			e.burn_card(c.id)
+		if not play.is_empty():
+			e.play_cards(_ids(play))
 		if not drawers.is_empty():
 			continue  # the drawn card may help
 		break
+	# A shield it can't break goes to the bottom and comes back: cycle the hand (play everything,
+	# ♥ store shield, ♦ draw) so the next try starts from fresh cards instead of the same ones.
+	var aneed2: int = e.attack_need()
+	if aneed2 > 0 and int(e.compute(s.played)["attack"]) < aneed2 and not s.hand.is_empty():
+		e.play_cards(_ids(s.hand))
 	var need: int = e.block_need()
 	if need > 0:
 		var miss: int = need - int(e.compute(s.played)["block"])
@@ -106,16 +112,25 @@ func _play_thrifty(e) -> void:
 		# (an ace costs 1 life once, a miss costs a life and the attack comes back).
 		if miss >= graded or (miss > 0 and bool(s.balance.get("failed_attack_returns", false))):
 			for a in e.sacrificable_aces():
-				if a.base_red() or not s.balance["ace_sac_own_color"]:
+				if a.base_red():
 					e.sacrifice_ace(a.id)
 					break
 	# Free discard: drop below-average unplayed cards so the refill can bring better ones.
 	if e.can_discard():
 		var avg := _deck_avg(s)
 		for c in s.hand.duplicate():
-			if c.joker == "" and c.value() < avg:
+			if c.value() < avg:
 				e.discard_card(c.id)
 	e.resolve()
+
+
+## How many cards the bot may still burn this round (an unlimited burn is capped at 2 per plan).
+static func _burns_left(e) -> int:
+	if not e.can_burn():
+		return 0
+	var lim := int(e.state.balance.get("burn_limit", 0))
+	var left: int = 2 if lim <= 0 else lim - int(e.state.burns_this_round)
+	return clampi(left, 0, maxi(0, e.state.deck.size() - int(e.state.balance["deck_min"])))
 
 
 static func _deck_avg(s) -> float:
@@ -127,48 +142,71 @@ static func _deck_avg(s) -> float:
 	return float(t) / s.deck.size()
 
 
-## Smallest-value subset of `cards` that reaches the need (full = true) or that keeps a block miss
-## below the graded threshold (full = false). Returns [] if none does.
-static func _cheapest_set(e, cards: Array, full: bool) -> Array:
+## Cheapest {play: [cards], burn: [cards]} from the hand that reaches the need (full = true) or that
+## keeps a block miss below the graded threshold (full = false), burning at most `max_burns` cards.
+## Returns {} if none does.
+static func _cheapest_plan(e, full: bool, max_burns: int) -> Dictionary:
+	var s = e.state
+	var hand: Array = s.hand.slice(0, 8)
+	var ctx := {"best": {}, "cost": 1 << 30}
+	_search(e, hand, 0, [], [], 0, max_burns, full, ctx)
+	return ctx["best"]
+
+
+static func _search(e, hand: Array, i: int, play: Array, burn: Array, cost: int, max_burns: int, full: bool, ctx: Dictionary) -> void:
+	if cost - EXACT_BONUS >= int(ctx["cost"]):
+		return
+	if i == hand.size():
+		if play.is_empty() and burn.is_empty():
+			return
+		var c := _plan_cost(e, play, burn, cost, full)
+		if c >= 0 and c < int(ctx["cost"]):
+			ctx["cost"] = c
+			ctx["best"] = {"play": play.duplicate(), "burn": burn.duplicate()}
+		return
+	var card = hand[i]
+	_search(e, hand, i + 1, play, burn, cost, max_burns, full, ctx)
+	if e.is_effective(card):
+		play.append(card)
+		_search(e, hand, i + 1, play, burn, cost + card.value() * 10 + 1, max_burns, full, ctx)
+		play.pop_back()
+	if burn.size() < max_burns:
+		burn.append(card)
+		card.burned = true  # so compute() values it as burned
+		_search(e, hand, i + 1, play, burn, cost + card.value() * 10 + BURN_COST, max_burns, full, ctx)
+		card.burned = false
+		burn.pop_back()
+
+
+## Cost of a finished plan, or -1 if it doesn't do the job.
+static func _plan_cost(e, play: Array, burn: Array, cost: int, full: bool) -> int:
 	var s = e.state
 	var bneed: int = e.block_need()
 	var aneed: int = e.attack_need()
-	var graded := int(s.balance["graded_threshold"])
-	var best: Array = []
-	var best_cost := 1 << 30
-	var n := mini(cards.size(), 10)
-	for mask in range(1, 1 << n):
-		var sub: Array = []
-		var cost := 0
-		for i in n:
-			if mask & (1 << i):
-				sub.append(cards[i])
-				cost += cards[i].value() * 10 + 1
-		if cost - EXACT_BONUS >= best_cost:
-			continue
-		var t: Dictionary = e.compute(s.played + sub)
-		var ok: bool
-		if full:
-			var ls: bool = bneed <= 0 and e.lockout_risk()
-			ok = int(t["block"]) >= bneed and (int(t["attack"]) >= aneed or (ls and int(t["block"]) >= aneed))
-		else:
-			ok = bneed - int(t["block"]) < graded
-		if ok and full and int(s.balance.get("perfect_draw", 0)) > 0:
-			# A perfect hit (exactly the enemy value) draws an extra card: worth a little overspend.
-			var exact_b: bool = bneed <= 0 or int(t["block"]) == bneed
-			var exact_a: bool = aneed <= 0 or int(t["attack"]) == aneed \
-				or (bneed <= 0 and e.lockout_risk() and int(t["block"]) == aneed)
-			if exact_b and exact_a:
-				cost -= EXACT_BONUS
-		if ok and cost < best_cost:
-			best = sub
-			best_cost = cost
-	return best
+	for c in burn:
+		c.burned = true
+	var t: Dictionary = e.compute(s.played + play + burn)
+	for c in burn:
+		c.burned = false
+	var ok: bool
+	if full:
+		ok = int(t["block"]) >= bneed and int(t["attack"]) >= aneed
+	else:
+		ok = bneed - int(t["block"]) < int(s.balance["graded_threshold"])
+	if not ok:
+		return -1
+	if full and int(s.balance.get("perfect_draw", 0)) > 0:
+		# A perfect hit (exactly the enemy value) draws an extra card: worth a little overspend.
+		var exact_b: bool = bneed <= 0 or int(t["block"]) == bneed
+		var exact_a: bool = aneed <= 0 or int(t["attack"]) == aneed
+		if exact_b and exact_a:
+			cost -= EXACT_BONUS
+	return cost
 
 
 ## Old rules (unplayed cards are discarded): play every card that counts.
 func _play_all(e) -> void:
-	# Play all usable cards; repeat while ♦ / draw2 bring in new usable cards.
+	# Play all usable cards; repeat while ♦ bring in new usable cards.
 	while true:
 		var p: Array = e.playable_cards()
 		if p.is_empty():
@@ -180,7 +218,7 @@ func _play_all(e) -> void:
 		var miss: int = need - int(t["block"])
 		if miss >= int(e.state.balance["graded_threshold"]) or (miss > 0 and bool(e.state.balance.get("failed_attack_returns", false))):
 			for a in e.sacrificable_aces():
-				if a.base_red() or not e.state.balance["ace_sac_own_color"]:
+				if a.base_red():
 					e.sacrifice_ace(a.id)
 					break
 	e.resolve()
@@ -199,12 +237,8 @@ func _reward(e) -> void:
 		return
 	var same: Array = []
 	for d in s.deck:
-		if d.joker == "" and d.is_red() == c.base_red():
+		if d.is_red() == c.base_red():
 			same.append(d)
-	if same.is_empty():
-		for d in s.deck:
-			if d.joker == "":
-				same.append(d)
 	if same.is_empty():
 		same = s.deck
 	var w = same[0]
@@ -241,14 +275,8 @@ static func _best(s, opts: Array):
 
 
 static func _lowest(deck: Array):
-	var pool: Array = []
+	var w = deck[0]
 	for d in deck:
-		if d.joker == "":
-			pool.append(d)
-	if pool.is_empty():
-		pool = deck
-	var w = pool[0]
-	for d in pool:
 		if d.value() < w.value():
 			w = d
 	return w

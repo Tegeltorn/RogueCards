@@ -1,5 +1,5 @@
 extends Control
-## Run start: the mod ace and the theme king are flipped face up and explained.
+## Run start: the mod ace is flipped face up and explained.
 ## With the Rik mod the player also picks an extra three here.
 
 const Style := preload("res://ui/style.gd")
@@ -33,15 +33,8 @@ func enter() -> void:
 	_v.add_child(Style.label("Seed %d" % s.seed_value, 22, Style.MUTED))
 
 	var mod_ev := _find_event("mod_revealed")
-	var theme_ev := _find_event("theme_revealed")
 	_v.add_child(_reveal_block(s.mod_ace, "MOD ACE", mod_ev.get("name", "") if mod_ev.get("active", true) else "Mods disabled",
 		mod_ev.get("desc", "") if mod_ev.get("active", true) else "", 0.3))
-	var jt := ""
-	if theme_ev.get("active", true):
-		jt = "Red joker (after the Jack floor): %s\nBlack joker (boss): %s" % [theme_ev.get("red", ""), theme_ev.get("black", "")]
-	else:
-		jt = "Jokers disabled"
-	_v.add_child(_reveal_block(s.theme_king, "THEME KING", "King of " + Style.SUIT_NAME.get(s.theme_suit, ""), jt, 0.9))
 
 	var lives := "Lives: " + "  ".join(s.lives.map(func(a): return "A" + Style.SUIT_SYM[a.suit]))
 	_v.add_child(Style.label(lives, 26, Style.WHITE))

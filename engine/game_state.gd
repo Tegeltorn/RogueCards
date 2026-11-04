@@ -1,7 +1,7 @@
 extends RefCounted
 ## All mutable state of one run. Owned and mutated only by engine.gd.
 
-enum Phase { SETUP_PICK, REVEAL, PLAY, RETAIN, REWARD, REWARD_REMOVE, JOKER_ATTACH, WON, LOST }
+enum Phase { SETUP_PICK, REVEAL, PLAY, RETAIN, REWARD, REWARD_REMOVE, WON, LOST }
 
 const BOSS_FLOOR := 13
 const FIRST_FLOOR := 3
@@ -12,8 +12,6 @@ var phase: int = Phase.REVEAL
 
 var mod_suit: String = ""
 var mod_ace = null          # Card
-var theme_suit: String = ""
-var theme_king = null       # Card
 
 var lives: Array = []       # Card (aces) currently alive
 var lost_lives: Array = []  # Card (aces) lost, can be restored
@@ -42,9 +40,8 @@ var floor_round: int = 0
 var setup_options: Array = []
 var setup_picks: int = 0     # how many of setup_options may still be taken
 var reward: Dictionary = {}  # {suit, heal, picks, reveal, remove, options:[Card]}
-var red_joker_effect: String = ""
-var black_joker_effect: String = ""
-var joker_attached: bool = false
+var burns_this_round: int = 0
+var burned_total: int = 0
 
 var next_id: int = 1
 var result: String = ""      # "", "win", "dead"

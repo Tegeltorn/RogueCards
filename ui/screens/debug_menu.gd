@@ -1,5 +1,5 @@
 extends RefCounted
-## Debug menu: edit balance values (saved locally, applied from the next run), force theme/mod,
+## Debug menu: edit balance values (saved locally, applied from the next run), force the mod,
 ## jump to a floor, give a life.
 
 const Style := preload("res://ui/style.gd")
@@ -49,7 +49,7 @@ func build(main) -> Control:
 		body.add_child(life)
 
 	body.add_child(Style.label("Force (next run)", 26, Style.MUTED))
-	for pair in [["force_theme", "Theme king"], ["force_mod", "Mod ace"]]:
+	for pair in [["force_mod", "Mod ace"]]:
 		var h := HBoxContainer.new()
 		var l := Style.label(pair[1], 24, Style.WHITE, HORIZONTAL_ALIGNMENT_LEFT)
 		l.size_flags_horizontal = Control.SIZE_EXPAND_FILL

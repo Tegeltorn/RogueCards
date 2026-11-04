@@ -37,7 +37,7 @@ jobs:
         run: timeout 600 godot --headless --path . --script res://tests/ui_smoke.gd -- --runs 2
       - name: Simulation (5000 runs)
         run: |
-          godot --headless --path . --script res://sim/run_sim.gd -- --runs 5000 --all --out sim_report.md
+          godot --headless --path . --script res://sim/run_sim.gd -- --runs 5000 --out sim_report.md
           { echo '## Bot simulation'; echo '```'; cat sim_report.md; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
 
   export:

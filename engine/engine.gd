@@ -23,19 +23,18 @@ var rng: Rng
 var mod: ModBase
 var record_events := true  # the simulator turns this off for speed
 var _excluded: Dictionary = {}  # rank -> Array of suits taken by the start pick (removed from that floor)
-var _boss_pile: Array = []
 ## Every player action taken this run, as [name, args]. With the seed this rebuilds the run exactly
 ## (the engine is deterministic), so the UI can save a run and resume it after a reload.
 var journal: Array = []
 var _start: Dictionary = {}
 var _depth := 0  # > 0 while an action runs (actions calling actions are not journaled twice)
 
-const SAVE_VERSION := 1
+const SAVE_VERSION := 2
 
 
 # ---------------------------------------------------------------- setup
 
-## options: force_mod ("H".."C"), force_theme ("H".."C"), start_floor (int)
+## options: force_mod ("H".."C"), start_floor (int)
 func start_run(p_seed: int, balance: Dictionary = {}, options: Dictionary = {}) -> void:
 	state = GameState.new()
 	rng = Rng.new(p_seed)
@@ -59,21 +58,6 @@ func start_run(p_seed: int, balance: Dictionary = {}, options: Dictionary = {}) 
 	state.lives = aces.slice(0, int(b["lives"]))
 	state.max_lives = state.lives.size()
 
-	# Theme king.
-	var kings: Array = []
-	for s in Card.SUITS:
-		kings.append(_new_card(13, s))
-	rng.shuffle(kings)
-	_force_front(kings, options.get("force_theme", ""))
-	state.theme_king = kings.pop_front()
-	state.theme_suit = state.theme_king.suit
-	_boss_pile = kings
-	var jdata: Dictionary = Balance.jokers().get(state.theme_suit, {})
-	if b["jokers_enabled"]:
-		_boss_pile.append(_new_card(0, "J"))
-		state.red_joker_effect = jdata.get("red", {}).get("effect", "")
-		state.black_joker_effect = jdata.get("black", {}).get("effect", "")
-
 	# Mod.
 	var mdata: Dictionary = Balance.mods().get(state.mod_suit, {})
 	if b["mods_enabled"] and MOD_SCRIPTS.has(mdata.get("id", "")):
@@ -91,9 +75,6 @@ func start_run(p_seed: int, balance: Dictionary = {}, options: Dictionary = {}) 
 		state.deck.append(_new_card(2, s))
 
 	_emit(Ev.MOD_REVEALED, {"suit": state.mod_suit, "name": mod.name, "desc": mod.desc, "active": b["mods_enabled"]})
-	_emit(Ev.THEME_REVEALED, {"suit": state.theme_suit,
-		"red": jdata.get("red", {}).get("desc", ""), "black": jdata.get("black", {}).get("desc", ""),
-		"active": b["jokers_enabled"]})
 
 	state.floor_num = int(options.get("start_floor", first_floor()))
 	# Start pick: reveal `start_pick_offer` random cards of `start_pick_rank` and keep some of them.
@@ -157,30 +138,18 @@ func _start_floor(f: int) -> void:
 	state.current = []
 	state.last_beaten = null
 	state.last_used = null
-	if f >= GameState.BOSS_FLOOR:
-		state.floor_num = GameState.BOSS_FLOOR
-		state.enemy_pile = _boss_pile.duplicate()
-		rng.shuffle(state.enemy_pile)
-	else:
-		var cards: Array = []
-		var removed: Array = _excluded.get(f, [])
-		for s in Card.SUITS:
-			if not removed.has(s):
-				cards.append(_new_card(f, s))
-		rng.shuffle(cards)
-		if state.balance["short_floors"].has(f) and cards.size() > 3:
-			cards.resize(3)
-		state.enemy_pile = cards
-	# Piles reset every floor: whole deck shuffled, innate (red joker) cards on top.
+	# Every floor is the four cards of its rank (the kings last), minus any taken by the start pick.
+	state.floor_num = mini(f, GameState.BOSS_FLOOR)
+	var cards: Array = []
+	var removed: Array = _excluded.get(state.floor_num, [])
+	for s in Card.SUITS:
+		if not removed.has(s):
+			cards.append(_new_card(state.floor_num, s))
+	rng.shuffle(cards)
+	state.enemy_pile = cards
+	# Piles reset every floor: the whole deck is shuffled into a new draw pile.
 	state.draw_pile = state.deck.duplicate()
 	rng.shuffle(state.draw_pile)
-	var innate: Array = []
-	for c in state.draw_pile:
-		if c.joker == "innate":
-			innate.append(c)
-	for c in innate:
-		state.draw_pile.erase(c)
-		state.draw_pile.append(c)
 	state.discard = []
 	state.hand = []
 	state.played = []
@@ -196,20 +165,16 @@ func _next_round() -> void:
 		if state.enemy_pile.is_empty():
 			_floor_cleared()
 			return
-		var c = state.enemy_pile.pop_front()
-		if c.suit == "J":
-			state.current = _black_joker(c)
-		else:
-			state.current = [c]
+		state.current = [state.enemy_pile.pop_front()]
 	state.round_num += 1
 	state.floor_round += 1
 	for c in state.current:
 		_emit(Ev.ENEMY_REVEALED, {"card": c.label(), "id": c.id, "rank": c.rank, "suit": c.suit,
 			"intent": "attack" if c.base_black() else "shield", "value": enemy_value(c),
-			"left": state.enemy_pile.size(), "total_left": state.enemy_pile.size() + state.current.size(),
-			"virtual": c.from_joker})
+			"left": state.enemy_pile.size(), "total_left": state.enemy_pile.size() + state.current.size()})
 	# Fill the hand. With keep_hand, unplayed cards simply stay; otherwise only the retained ones.
 	state.overpowered = false
+	state.burns_this_round = 0
 	if not keep_hand():
 		state.hand = state.retained
 	state.retained = []
@@ -236,39 +201,6 @@ func _draw_one():
 		_emit(Ev.DECK_RESHUFFLED, {"count": state.draw_pile.size()})
 	return state.draw_pile.pop_back()
 
-
-func _black_joker(j) -> Array:
-	state.beaten.append(j)
-	var eff := state.black_joker_effect
-	var desc: String = Balance.jokers().get(state.theme_suit, {}).get("black", {}).get("desc", eff)
-	_emit(Ev.JOKER_TRIGGERED, {"effect": eff, "desc": desc})
-	var curse := int(state.balance["joker_curse_value"])
-	match eff:
-		"return_king":
-			for i in range(state.beaten.size() - 1, -1, -1):
-				var k = state.beaten[i]
-				if k.suit != "J" and not k.from_joker:
-					state.beaten.remove_at(i)
-					state.enemy_pile.append(k)
-					break
-			return []
-		"shield":
-			return [_virtual(curse, "D")]
-		"attack":
-			return [_virtual(curse, "S")]
-		"double_reveal":
-			var out: Array = []
-			while out.size() < 2 and not state.enemy_pile.is_empty():
-				out.append(state.enemy_pile.pop_front())
-			return out
-	return []
-
-
-func _virtual(rank: int, suit: String):
-	var v = _new_card(rank, suit)
-	v.temp = true
-	v.from_joker = true
-	return v
 
 
 # ---------------------------------------------------------------- queries (UI + bot)
@@ -300,8 +232,7 @@ func can_play_card(c) -> bool:
 
 ## True if the card counts against the revealed enemy (right colour: red vs attack, black vs shield).
 func is_effective(c) -> bool:
-	return (block_need() > 0 and c.is_red()) or (attack_need() > 0 and c.is_black()) \
-		or (c.is_red() and lockout_risk())
+	return (block_need() > 0 and c.is_red()) or (attack_need() > 0 and c.is_black())
 
 
 ## Cards in hand that count against the current enemy (used by the bot and for highlighting).
@@ -312,16 +243,6 @@ func playable_cards() -> Array:
 			out.append(c)
 	return out
 
-
-## True when a shield is revealed and no black enemy cards are left in the pile:
-## failing to break it costs a life (the "locked" rule).
-func lockout_risk() -> bool:
-	if attack_need() <= 0:
-		return false
-	for e in state.enemy_pile:
-		if e.base_black():
-			return false
-	return true
 
 
 func retain_limit() -> int:
@@ -339,9 +260,7 @@ func sacrificable_aces() -> Array:
 	if not ace_sac_allowed():
 		return out
 	for a in state.lives:
-		if not state.balance["ace_sac_own_color"]:
-			out.append(a)
-		elif (a.base_red() and block_need() > 0) or (a.base_black() and attack_need() > 0):
+		if (a.base_red() and block_need() > 0) or (a.base_black() and attack_need() > 0):
 			out.append(a)
 	return out
 
@@ -350,14 +269,40 @@ func preview_enemies() -> Array:
 	return state.enemy_pile.slice(0, mod.preview_count())
 
 
+## Value of a burned card: double its rank ("double") or its rank in the other colour ("swap").
+## Only the number counts: no suit effects.
+func burn_value(c) -> int:
+	return c.rank * (2 if burn_mode() == "double" else 1)
+
+
+func burn_mode() -> String:
+	return str(state.balance.get("burn_mode", "off"))
+
+
+## Colour a card counts as when played: a burned card in "swap" mode counts as the other colour.
+func counts_red(c) -> bool:
+	if c.burned and burn_mode() == "swap":
+		return c.base_black()
+	return c.base_red()
+
+
+## True when the card adds only its number (sacrificed ace, burned card): no suit effects.
+func _plain(c) -> bool:
+	return c.burned or (c.temp and not state.balance["ace_sac_suit_effects"])
+
+
 func _block_val(c) -> int:
-	if c.temp and not state.balance["ace_sac_suit_effects"]:
+	if c.burned:
+		return burn_value(c)
+	if _plain(c):
 		return c.rank
 	return c.value()
 
 
 func _attack_val(c) -> int:
-	if c.temp and not state.balance["ace_sac_suit_effects"]:
+	if c.burned:
+		return burn_value(c)
+	if _plain(c):
 		return c.rank
 	if c.suit == "S":
 		return int(floor(c.value() * float(state.balance["spade_multiplier"])))
@@ -368,38 +313,25 @@ func _attack_val(c) -> int:
 func compute(cards: Array) -> Dictionary:
 	var bneed := block_need()
 	var aneed := attack_need()
-	var carry := state.carry_shield if bneed > 0 or lockout_risk() else 0
+	var carry := state.carry_shield if bneed > 0 else 0
 	var reds: Array = []
 	var blacks: Array = []
-	var duals: Array = []
 	for c in cards:
-		if c.joker == "dual":
-			duals.append(c)
-		elif c.is_red():
+		if counts_red(c):
 			reds.append(c)
 		else:
 			blacks.append(c)
-	for d in duals:
-		var cur := carry
-		for r in reds:
-			cur += _block_val(r)
-		if bneed > cur:
-			reds.append(d)
-		elif aneed > 0:
-			blacks.append(d)
-		else:
-			reds.append(d)
 	var block := carry
 	var hearts := 0
 	for c in reds:
 		block += _block_val(c)
-		if c.suit == "H" and (not c.temp or state.balance["ace_sac_suit_effects"]):
+		if c.suit == "H" and not _plain(c):
 			hearts += _block_val(c)
 	var attack := 0
 	var clubs := 0
 	for c in blacks:
 		attack += _attack_val(c)
-		if c.suit == "C" and (not c.temp or state.balance["ace_sac_suit_effects"]):
+		if c.suit == "C" and not _plain(c):
 			clubs += 1
 	if clubs >= 2:
 		attack += int(state.balance["club_pair_bonus"])
@@ -414,14 +346,14 @@ func overpower_value(cards: Array) -> int:
 	var mult := int(state.balance.get("overpower_multiplier", 2))
 	if mult <= 0 or block_need() <= 0 or attack_need() > 0:
 		return 0
-	var blacks: Array = cards.filter(func(c): return c.is_black() and not c.is_red())
+	var blacks: Array = cards.filter(func(c): return not counts_red(c))
 	if blacks.is_empty():
 		return 0
 	var atk := 0
 	var clubs := 0
 	for c in blacks:
 		atk += _attack_val(c)
-		if c.suit == "C":
+		if c.suit == "C" and not _plain(c):
 			clubs += 1
 	if clubs >= 2:
 		atk += int(state.balance["club_pair_bonus"])
@@ -473,31 +405,73 @@ func _do_play_cards(ids: Array) -> bool:
 		state.hand.erase(c)
 		state.played.append(c)
 	_emit(Ev.CARDS_PLAYED, {"cards": _labels(cards), "ids": _ids(cards)})
-	var draws := 0
-	# Overpower: black cards worth at least `overpower_multiplier` × the enemy attack (with no shield
-	# revealed) are discarded at once and you draw 1 card. The enemy still attacks at End turn.
-	# Counts every black card played against this attack so far; triggers once per round.
-	var ov := 0 if state.overpowered else overpower_value(state.played)
-	if ov > 0:
-		var blacks: Array = state.played.filter(func(c): return c.is_black() and not c.is_red())
-		for c in blacks:
-			state.played.erase(c)
-			if not c.temp:
-				state.discard.append(c)
-		state.overpowered = true
-		draws += int(state.balance.get("overpower_draw", 1))
-		_emit(Ev.OVERPOWER, {"attack": ov, "enemy": block_need(), "ids": _ids(blacks), "cards": _labels(blacks)})
+	var draws := _check_overpower()
 	for c in cards:
 		if c.suit == "D":
 			draws += 1
-		if c.joker == "draw2":
-			draws += 2
-	for i in draws:
+	_draw_now(draws)
+	return true
+
+
+## Overpower: black cards worth at least `overpower_multiplier` × the enemy attack (with no shield
+## revealed) are discarded at once and you draw 1 card. The enemy still attacks at End turn.
+## Counts every black card played against this attack so far; triggers once per round.
+## Returns the number of cards to draw.
+func _check_overpower() -> int:
+	var ov := 0 if state.overpowered else overpower_value(state.played)
+	if ov <= 0:
+		return 0
+	var blacks: Array = state.played.filter(func(c): return not counts_red(c))
+	for c in blacks:
+		state.played.erase(c)
+		if not c.temp and not c.burned:
+			state.discard.append(c)
+	state.overpowered = true
+	_emit(Ev.OVERPOWER, {"attack": ov, "enemy": block_need(), "ids": _ids(blacks), "cards": _labels(blacks)})
+	return int(state.balance.get("overpower_draw", 1))
+
+
+func _draw_now(n: int) -> void:
+	for i in n:
 		var d = _draw_one()
 		if d == null:
 			break
 		state.hand.append(d)
 		_emit(Ev.CARD_DRAWN, {"card": d.label(), "id": d.id})
+
+
+## Burn: a card from your hand burns up and leaves your deck for good. This round it counts as
+## double its rank in its own colour ("double") or as its rank in the other colour ("swap"),
+## with no suit effects. At most `burn_limit` per round (0 = no limit); the deck never shrinks
+## below `deck_min`.
+func can_burn(c = null) -> bool:
+	if state.phase != Phase.PLAY or burn_mode() == "off":
+		return false
+	var lim := int(state.balance.get("burn_limit", 0))
+	if lim > 0 and state.burns_this_round >= lim:
+		return false
+	if state.deck.size() <= int(state.balance["deck_min"]):
+		return false
+	return c == null or state.hand.has(c)
+
+
+func burn_card(card_id: int) -> bool:
+	return _act("burn_card", [card_id])
+
+
+func _do_burn_card(card_id: int) -> bool:
+	var c = state.find_in(state.hand, card_id)
+	if c == null or not can_burn(c):
+		return false
+	state.hand.erase(c)
+	state.deck.erase(c)
+	c.burned = true
+	state.played.append(c)
+	state.burns_this_round += 1
+	state.burned_total += 1
+	_emit(Ev.CARD_BURNED, {"card": c.label(), "id": c.id, "value": burn_value(c),
+		"colour": "red" if counts_red(c) else "black", "deck": state.deck.size()})
+	_draw_now(_check_overpower())
 	return true
 
 
@@ -534,8 +508,6 @@ func _do_sacrifice_ace(ace_id: int) -> bool:
 	state.lost_lives.append(a)
 	var t = _new_card(int(state.balance["ace_value"]), a.suit)
 	t.temp = true
-	if not state.balance["ace_sac_own_color"]:
-		t.joker = "dual"
 	state.played.append(t)
 	_emit(Ev.ACE_SACRIFICED, {"card": a.label(), "id": a.id, "value": t.rank, "temp_id": t.id})
 	_emit(Ev.LIFE_LOST, {"card": a.label(), "id": a.id, "lives": state.lives.size(), "cause": "sacrifice"})
@@ -554,7 +526,6 @@ func _do_resolve() -> bool:
 	var b := state.balance
 	var bneed: int = t["block_need"]
 	var aneed: int = t["attack_need"]
-	var report_store := false
 	if bneed > 0:
 		var blk: int = t["block"]
 		var new_carry := 0
@@ -583,9 +554,8 @@ func _do_resolve() -> bool:
 			_emit(Ev.SHIELD_STORED, {"amount": new_carry})
 	elif int(t["hearts"]) > 0:
 		# ♥ played with no attack to block: the whole heart value is stored (replaces older shield).
-		# Reported after the shield is settled: a blocked last stand uses the hearts and keeps only the rest.
 		state.carry_shield = int(t["hearts"])
-		report_store = true
+		_emit(Ev.SHIELD_STORED, {"amount": state.carry_shield})
 	elif b["heart_carry_mode"] == "next_round":
 		state.carry_shield = 0
 	if aneed > 0:
@@ -598,35 +568,12 @@ func _do_resolve() -> bool:
 			for e in shields:
 				_beat(e, _last_counting(state.played, t["attack_cards"]))
 		else:
-			var black_left := false
-			for e in state.enemy_pile:
-				if e.base_black():
-					black_left = true
-					break
-			if not black_left:
-				# Last stand: the cornered shield strikes back with its value. Red cards can block it.
-				var lblk: int = t["block"]
-				if lblk >= aneed:
-					_emit(Ev.LAST_STAND_BLOCKED, {"block": lblk, "shield": aneed, "exact": lblk == aneed})
-					if lblk == aneed:
-						_perfect("block")
-					state.carry_shield = mini(lblk - aneed, int(t["hearts"]))
-					for e in shields:
-						_beat(e, _last_counting(state.played, t["block_cards"]))
-				else:
-					_emit(Ev.LOCKOUT, {"attack": atk, "shield": aneed, "block": lblk})
-					if _lose_lives(1, "lockout"):
-						return true
-					for e in shields:
-						_beat(e)
-			else:
-				_emit(Ev.ATTACK_FAILED, {"attack": atk, "shield": aneed})
-				for e in shields:
-					state.enemy_pile.append(e)
-	if report_store and state.carry_shield > 0:
-		_emit(Ev.SHIELD_STORED, {"amount": state.carry_shield})
+			# Not broken: the shield goes to the bottom of the enemy pile and comes back.
+			_emit(Ev.ATTACK_FAILED, {"attack": atk, "shield": aneed})
+			for e in shields:
+				state.enemy_pile.append(e)
 	for c in state.played:
-		if not c.temp:
+		if not c.temp and not c.burned:
 			state.discard.append(c)
 	state.played = []
 	state.current = []
@@ -728,7 +675,7 @@ func _lose_lives(n: int, cause: String) -> bool:
 
 func _floor_cleared() -> void:
 	# The reward follows the last player card that counted against the final enemy card
-	# (falls back to that enemy card when nothing did, e.g. a stored shield or a lockout).
+	# (falls back to that enemy card when nothing did, e.g. a stored ♥ shield blocked it alone).
 	var last = state.last_used if state.last_used != null else state.last_beaten
 	_emit(Ev.FLOOR_CLEARED, {"floor": state.floor_num, "last": last.label() if last else "",
 		"suit": last.suit if last else "",
@@ -740,8 +687,7 @@ func _floor_cleared() -> void:
 		return
 	var pool: Array = []
 	for c in state.beaten:
-		if c.suit != "J" and not c.from_joker:
-			pool.append(_new_card(c.rank, c.suit))
+		pool.append(_new_card(c.rank, c.suit))
 	rng.shuffle(pool)
 	var suit: String = last.suit if last and Card.SUITS.has(last.suit) else "S"
 	var r := reward_rules(suit)
@@ -926,30 +872,7 @@ func _after_pick() -> void:
 
 func _finish_reward() -> void:
 	state.reward = {}
-	if state.balance["jokers_enabled"] and not state.joker_attached \
-			and state.floor_num == int(state.balance["red_joker_after_floor"]):
-		state.phase = Phase.JOKER_ATTACH
-		var desc: String = Balance.jokers().get(state.theme_suit, {}).get("red", {}).get("desc", "")
-		_emit(Ev.JOKER_OFFERED, {"effect": state.red_joker_effect, "desc": desc})
-		return
 	_start_floor(state.floor_num + 1)
-
-
-func attach_joker(card_id: int) -> bool:
-	return _act("attach_joker", [card_id])
-
-
-func _do_attach_joker(card_id: int) -> bool:
-	if state.phase != Phase.JOKER_ATTACH:
-		return false
-	var c = state.find_in(state.deck, card_id)
-	if c == null:
-		return false
-	c.joker = state.red_joker_effect
-	state.joker_attached = true
-	_emit(Ev.JOKER_ATTACHED, {"card": c.label(), "id": c.id, "effect": c.joker})
-	_start_floor(state.floor_num + 1)
-	return true
 
 
 # ---------------------------------------------------------------- debug

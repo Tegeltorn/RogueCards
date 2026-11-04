@@ -26,7 +26,7 @@ static func write(path: String, data: Dictionary) -> void:
 
 static func settings() -> Dictionary:
 	var d := read(SETTINGS, {})
-	var defaults := {"crt": true, "sound": true, "night": false, "vibration": true, "force_theme": "", "force_mod": ""}
+	var defaults := {"crt": true, "sound": true, "night": false, "vibration": true, "force_mod": ""}
 	for k in defaults.keys():
 		if not d.has(k):
 			d[k] = defaults[k]
@@ -47,18 +47,26 @@ static func save_overrides(d: Dictionary) -> void:
 
 static func stats() -> Dictionary:
 	var d := read(STATS, {})
-	for k in ["runs", "wins"]:
+	for k in ["runs", "wins", "best"]:
 		if not d.has(k):
 			d[k] = 0
-	for k in ["loss_floor", "theme", "mod"]:
+	for k in ["loss_floor", "mod"]:
 		if not d.has(k):
 			d[k] = {}
 	return d
 
 
+## How far a run got: the floor reached (4 … 13), 14 for a win.
+static func progress(state) -> int:
+	return 14 if state.result == "win" else int(state.floor_num)
+
+
 ## Record a finished run. Keys are strings because JSON objects only have string keys.
-static func record_run(state) -> void:
+## Returns {"prev_best", "best"} (progress values) for the end-of-run comments.
+static func record_run(state) -> Dictionary:
 	var d := stats()
+	var prev_best := int(d["best"])
+	d["best"] = maxi(prev_best, progress(state))
 	var won: bool = state.result == "win"
 	d["runs"] = int(d["runs"]) + 1
 	if won:
@@ -66,12 +74,13 @@ static func record_run(state) -> void:
 	else:
 		var f := str(state.floor_num)
 		d["loss_floor"][f] = int(d["loss_floor"].get(f, 0)) + 1
-	for pair in [["theme", state.theme_suit], ["mod", state.mod_suit]]:
+	for pair in [["mod", state.mod_suit]]:
 		var bucket: Dictionary = d[pair[0]]
 		var v: Array = bucket.get(pair[1], [0, 0])
 		v = [int(v[0]) + (1 if won else 0), int(v[1]) + 1]
 		bucket[pair[1]] = v
 	write(STATS, d)
+	return {"prev_best": prev_best, "best": int(d["best"])}
 
 
 static func reset_stats() -> void:

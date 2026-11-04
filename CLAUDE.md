@@ -28,12 +28,12 @@ xvfb-run -a -s "-screen 0 800x1400x24" godot --path . --resolution 720x1280 --re
 - `engine/` is pure logic (`RefCounted`, no nodes or UI). All state lives in `GameState`. All randomness goes through `engine/rng.gd` (seeded).
 - Save & resume: every player action is a thin wrapper `func x(...): return _act("x", [...])` around `_do_x()`, so it is journaled; `engine.snapshot()`/`restore()` replay seed + journal. New actions must follow this pattern (`tests/test_save.gd`). The UI saves after each action (`user://run.save`) and resumes on start. On the web, a script in `html/head_include` reloads the page if WebGL is lost or the game stops beating (`window.rcBeat`) after switching apps.
 - Each engine action emits events (`engine/events.gd`). The UI (`ui/main.gd`) replays them in order through the active screen's `play_event()`, then calls `refresh()` to sync with the state.
-- All numbers live in `config/balance.json`. Mods are in `config/mods.json` + `engine/mods/*.gd` (hooks in `mod_base.gd`). Jokers are in `config/jokers.json` + `engine/engine.gd` (`_black_joker`, card `joker` field).
+- All numbers live in `config/balance.json`. Mods are in `config/mods.json` + `engine/mods/*.gd` (hooks in `mod_base.gd`). Burning (`burn_mode`, `burn_limit`) is in `engine/engine.gd` (`burn_card`, card `burned` field). No jokers, no theme king, no last stand: every floor is the four cards of its rank, the kings last.
 - Use `preload` consts, not `class_name`. Don't name a const `Engine`, it shadows the Godot singleton.
 - Warnings are errors for inferred Variant types: write `var x: int = dict.get(...)`, not `var x := dict.get(...)`.
 
 ## Design constraints
-- **Tabletop:** every rule must be playable by hand with a real 54-card deck. Use only the cards, integers and simple maths. Tuning may only touch knobs visible on the table.
+- **Tabletop:** every rule must be playable by hand with a real 52-card deck, as simply as a patience. Use only the cards, integers and simple maths. Tuning may only touch knobs visible on the table.
 - `RULES.md` (tabletop rules) must match `balance.json`. `tests/test_rules_doc.gd` enforces this, so update both together.
 - Language: the whole game, the event log and the docs are in English.
 - **Balance target:** bot win rate within `target.bot_win_rate_band` (15–22 %). Humans should land around 25 %. Use `sim/tune.gd` for sweeps. The spec's original values are in `config/presets/spec.json`.

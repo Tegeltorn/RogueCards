@@ -62,6 +62,44 @@ class FloorStrip:
 			draw_string(font, r.position + Vector2(0, size.y * 0.7), txt, HORIZONTAL_ALIGNMENT_CENTER, w, 26 if f == current else 23, tc)
 
 
+class Fire:
+	extends Control
+	## The burn spot: a small brazier. Cards dropped here burn up and leave the deck for good.
+	var active := true   # burning is possible right now
+	var hot := false     # a dragged card is over it
+	var caption := "BURN"
+	var font: Font
+	var _t := 0.0
+
+	func _process(delta: float) -> void:
+		_t += delta
+		queue_redraw()
+
+	func _draw() -> void:
+		var r := Rect2(Vector2.ZERO, size)
+		var a := 1.0 if active else 0.4
+		var border := Style.GOLD if hot else Color(Style.INK, 0.35 * a)
+		draw_style_box(Style.box(Color(Style.PANEL, (0.95 if hot else 0.75) * a), border, 3 if hot else 1, 14), r)
+		# Gentle flames: three leaf-shaped tongues that sway slowly.
+		var base := Vector2(size.x * 0.22, size.y * 0.8)
+		var tall := size.y * (0.62 if hot else 0.5)
+		for i in 3:
+			var x := base.x + (i - 1) * size.y * 0.2
+			var sway := sin(_t * 2.2 + i * 1.7) * size.y * 0.05
+			var h := tall * (1.0 if i == 1 else 0.72) * (1.0 + 0.06 * sin(_t * 3.1 + i))
+			var w := size.y * (0.16 if i == 1 else 0.12)
+			var outer := PackedVector2Array([Vector2(x - w, base.y), Vector2(x - w * 0.6, base.y - h * 0.5),
+				Vector2(x + sway, base.y - h), Vector2(x + w * 0.6, base.y - h * 0.5), Vector2(x + w, base.y)])
+			draw_colored_polygon(outer, Color(Style.RED, 0.85 * a))
+			var inner := PackedVector2Array([Vector2(x - w * 0.5, base.y), Vector2(x + sway * 0.6, base.y - h * 0.6),
+				Vector2(x + w * 0.5, base.y)])
+			draw_colored_polygon(inner, Color(Style.GOLD, 0.9 * a))
+		draw_line(Vector2(base.x - size.y * 0.42, base.y + 2), Vector2(base.x + size.y * 0.42, base.y + 2), Color(Style.INK, 0.6 * a), 4, true)
+		var tc := Style.GOLD if hot else Color(Style.WHITE, a)
+		draw_string(font, Vector2(size.x * 0.44, size.y * 0.45), "BURN", HORIZONTAL_ALIGNMENT_LEFT, size.x * 0.54, 26, tc)
+		draw_string(font, Vector2(size.x * 0.44, size.y * 0.78), caption, HORIZONTAL_ALIGNMENT_LEFT, size.x * 0.54, 17, Color(Style.MUTED, a))
+
+
 var main
 var _e  # engine
 var _floor_strip: FloorStrip
@@ -89,8 +127,7 @@ var _help_btn: Button
 var _tooltip: PanelContainer
 var _tooltip_label: Label
 var _lives_caption: Label
-var _showdown: PanelContainer
-var _showdown_label: RichTextLabel
+var _fire: Fire
 var _finish_tip: PanelContainer
 var _finish_label: RichTextLabel
 var _mods_caption: Label
@@ -98,6 +135,7 @@ var _draw_btn: Button
 var _disc_btn: Button
 var _menu_btn: Button
 var _last_total := -1
+var _dragging := false  # a hand card is being dragged (the tooltip hides so the fire stays visible)
 var _reveal_fresh := true
 
 
@@ -139,7 +177,7 @@ func _build() -> void:
 	_lives_caption = Style.label("LIVES", 18, Style.MUTED, HORIZONTAL_ALIGNMENT_LEFT)
 	_lives_caption.autowrap_mode = TextServer.AUTOWRAP_OFF
 	add_child(_lives_caption)
-	_mods_caption = Style.label("MODS", 18, Style.MUTED, HORIZONTAL_ALIGNMENT_RIGHT)
+	_mods_caption = Style.label("MOD", 18, Style.MUTED, HORIZONTAL_ALIGNMENT_RIGHT)
 	_mods_caption.autowrap_mode = TextServer.AUTOWRAP_OFF
 	add_child(_mods_caption)
 	_seed_label = Style.label("", 18, Style.MUTED)
@@ -178,23 +216,6 @@ func _build() -> void:
 	_total_label.add_theme_font_override("normal_font", Style.display())
 	_total_label.add_theme_font_size_override("normal_font_size", 60)
 	add_child(_total_label)
-	_showdown = PanelContainer.new()
-	var tab := Style.box(Color(Style.RED.darkened(0.15), 0.94), Style.GOLD, 1, 10)
-	tab.content_margin_top = 4
-	tab.content_margin_bottom = 4
-	_showdown.add_theme_stylebox_override("panel", tab)
-	_showdown.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_showdown_label = RichTextLabel.new()
-	_showdown_label.bbcode_enabled = true
-	_showdown_label.fit_content = true
-	_showdown_label.scroll_active = false
-	_showdown_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_showdown_label.add_theme_font_size_override("normal_font_size", 20)
-	_showdown_label.autowrap_mode = TextServer.AUTOWRAP_OFF
-	_showdown.add_child(_showdown_label)
-	_showdown.visible = false
-	_showdown.z_index = 20
-	add_child(_showdown)
 	_finish_tip = PanelContainer.new()
 	_finish_tip.add_theme_stylebox_override("panel", Style.box(Color(Style.PANEL, 0.94), Color(Style.GOLD, 0.6), 1, 10))
 	_finish_tip.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -218,6 +239,10 @@ func _build() -> void:
 	_table = Control.new()
 	_table.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_table)
+	_fire = Fire.new()
+	_fire.font = Style.bold()
+	_fire.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_fire)
 	_hand_layer = Control.new()
 	_hand_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_hand_layer)
@@ -264,7 +289,7 @@ func _layout() -> void:
 	_help_btn.size = Vector2(76, 56)
 	_menu_btn.position = Vector2(W - 112, 10)
 	_menu_btn.size = Vector2(100, 56)
-	_info_box.position = Vector2(W - 16 - 2 * MINI.x - 6, 74)
+	_info_box.position = Vector2(W - 16 - MINI.x, 74)
 
 	_mods_caption.position = Vector2(W - 216, 74 + MINI.y + 2)
 	_mods_caption.size = Vector2(200, 24)
@@ -285,10 +310,7 @@ func _layout() -> void:
 	_total_label.position = Vector2(0, ty)
 	_total_label.size = Vector2(W, 80)
 	_total_label.pivot_offset = Vector2(W / 2, 40)
-	# A slim tab on the top edge of the enemy card, clear of the totals below it.
-	_showdown.position = Vector2(W / 2 - 160, ey - 24)
 	_finish_tip.position = Vector2(12, ey + 20)
-	_showdown.size = Vector2(320, 0)
 	_need_label.position = Vector2(0, ty + 72)
 	_need_label.size = Vector2(W, 30)
 	_carry_label.position = Vector2(0, ty + 100)
@@ -313,6 +335,11 @@ func _layout() -> void:
 	_hint_label.size = Vector2(W, 34)
 	_table.position = Vector2(0, ty + 134)
 	_table.size = Vector2(W, 110)
+	# The burn spot sits between the totals and the hand, clear of both.
+	var fy := ty + 134.0
+	var fh := clampf(hy - 56 - fy, 70.0, 104.0)
+	_fire.position = Vector2(W / 2 - 170, fy + maxf(0.0, (hy - 56 - fy - fh) / 2))
+	_fire.size = Vector2(340, fh)
 	_layout_hand()
 	_layout_table()
 	_layout_enemies()
@@ -356,7 +383,6 @@ func _sync_info() -> void:
 	for c in _info_box.get_children():
 		c.queue_free()
 	_info_box.add_child(_mini(s.mod_ace))
-	_info_box.add_child(_mini(s.theme_king))
 
 
 func _mini(card) -> CardView:
@@ -548,17 +574,37 @@ func _update_controls() -> void:
 	_main_btn.disabled = main.is_busy()
 	if playing:
 		_main_btn.text = "End turn"
-		_hint_label.text = "Drag cards onto the enemy to play them – tap to inspect" if _selected.is_empty() else ""
+		_hint_label.text = ("Drag onto the enemy to play, onto the fire to burn – tap to inspect" if _burn_on() else "Drag cards onto the enemy to play them – tap to inspect") if _selected.is_empty() else ""
 	elif retaining:
 		_main_btn.text = "Continue"
 		_hint_label.text = "Tap to keep %d card for next round" % _e.retain_limit()
 	else:
 		_hint_label.text = ""
 	_draw_btn.text = "Draw\n%d" % s.draw_pile.size()
-	_disc_btn.text = "Discard\n%d" % (s.discard.size() + s.played.filter(func(c): return not c.temp).size())
+	_disc_btn.text = "Discard\n%d" % (s.discard.size() + s.played.filter(func(c): return not c.temp and not c.burned).size())
+	_update_fire()
 	_update_total()
 	_update_life_glow()
 	_update_tooltip()
+
+
+func _burn_on() -> bool:
+	return _e.burn_mode() != "off"
+
+
+## The burn spot: shown while burning is in the rules; dimmed with the reason when it can't be used.
+func _update_fire() -> void:
+	var s = _e.state
+	_fire.visible = _burn_on() and s.phase == Phase.PLAY
+	if not _fire.visible:
+		return
+	_fire.active = _e.can_burn()
+	if _fire.active:
+		_fire.caption = "x2, then gone for good" if _e.burn_mode() == "double" else "other colour, gone for good"
+	elif s.deck.size() <= int(s.balance["deck_min"]):
+		_fire.caption = "deck needs %d+ cards" % (int(s.balance["deck_min"]) + 1)
+	else:
+		_fire.caption = "used this round"
 
 
 ## Life aces glow when a sacrifice could help (you would miss the block or fail the shield).
@@ -579,7 +625,7 @@ func _update_life_glow() -> void:
 func _update_tooltip() -> void:
 	var s = _e.state
 	var sel: Array = _selected if s.phase == Phase.PLAY else _retain_sel
-	if sel.size() != 1 or not _hand_views.has(sel[0]):
+	if _dragging or sel.size() != 1 or not _hand_views.has(sel[0]):
 		_tooltip.visible = false
 		return
 	var c = s.find_in(s.hand, sel[0])
@@ -602,7 +648,7 @@ func _left_text(n: int) -> String:
 
 func _update_total() -> void:
 	var s = _e.state
-	_update_showdown()
+	_update_finish_tip()
 	if s.phase != Phase.PLAY or s.current.is_empty():
 		_total_label.text = ""
 		_need_label.text = ""
@@ -622,18 +668,7 @@ func _update_total() -> void:
 		ok = ok and int(t["block"]) >= int(t["block_need"])
 		exact = int(t["block"]) == int(t["block_need"])
 		total += int(t["block"])
-	if int(t["attack_need"]) > 0 and int(t["block_need"]) == 0 and _e.lockout_risk():
-		# Last stand: break the shield OR block its desperate strike.
-		var an := int(t["attack_need"])
-		parts.append("ATTACK %d / %d" % [t["attack"], an])
-		parts.append("[font_size=30]or[/font_size]")
-		parts.append("BLOCK %d / %d" % [t["block"], an])
-		var by_atk := int(t["attack"]) >= an
-		var by_blk := int(t["block"]) >= an
-		ok = by_atk or by_blk
-		exact = (by_atk and int(t["attack"]) == an) or (not by_atk and by_blk and int(t["block"]) == an)
-		total += int(t["attack"]) + int(t["block"])
-	elif int(t["attack_need"]) > 0:
+	if int(t["attack_need"]) > 0:
 		parts.append("ATTACK %d / %d" % [t["attack"], t["attack_need"]])
 		ok = ok and int(t["attack"]) >= int(t["attack_need"])
 		exact = exact or int(t["attack"]) == int(t["attack_need"])
@@ -653,20 +688,19 @@ func _update_total() -> void:
 			_need_label.text = "Miss by %d: -%d %s" % [miss, lives, "life" if lives == 1 else "lives"]
 			if bool(s.balance.get("failed_attack_returns", false)):
 				_need_label.text += ", and it comes back"
-		elif _e.lockout_risk():
-			_need_label.text = "Break it or block its strike, or lose a life"
 		else:
-			_need_label.text = "The shield holds"
+			_need_label.text = "The shield holds: it goes to the bottom and comes back"
 	_need_label.add_theme_color_override("font_color", Style.MUTED)
 	var sel_cards: Array = []
 	for id in _selected:
 		var sc = s.find_in(s.hand, id)
 		if sc != null:
 			sel_cards.append(sc)
-	var has_black: bool = sel_cards.any(func(c): return c.is_black() and not c.is_red())
+	var has_black: bool = sel_cards.any(func(c): return c.is_black())
 	if has_black and int(t["block_need"]) > 0 and int(t["attack_need"]) == 0:
 		if _e.overpower_value(sel_cards) > 0:
-			_need_label.text = "OVERPOWER! Play: discard them, draw 1"
+			var od := int(s.balance.get("overpower_draw", 0))
+			_need_label.text = "OVERPOWER! Play: discard them" + (", draw %d" % od if od > 0 else "")
 			_need_label.add_theme_color_override("font_color", Style.GOLD)
 		else:
 			_need_label.text += "  ·  black %d/%d for overpower" % [_black_value(sel_cards), int(s.balance.get("overpower_multiplier", 2)) * int(t["block_need"])]
@@ -681,10 +715,8 @@ func _update_total() -> void:
 
 
 
-
-## Red ribbon over the enemy when failing this shield would cost a life (no black enemy cards left).
 func _black_value(cards: Array) -> int:
-	var t: Dictionary = _e.compute(cards.filter(func(c): return c.is_black() and not c.is_red()))
+	var t: Dictionary = _e.compute(cards.filter(func(c): return c.is_black()))
 	return int(t["attack"])
 
 
@@ -723,21 +755,6 @@ func _update_finish_tip() -> void:
 	_finish_label.text = "\n".join(lines)
 
 
-func _update_showdown() -> void:
-	_update_finish_tip()
-	var s = _e.state
-	var risk: bool = s.phase == Phase.PLAY and _e.lockout_risk()
-	if not risk:
-		_showdown.visible = false
-		return
-	_showdown_label.text = "[center][color=%s]LAST STAND[/color]  [color=%s]break it or block its strike[/color][/center]" % [Style.hex(Style.GOLD.lightened(0.35)), Style.hex(Style.ON_DARK)]
-	if not _showdown.visible:
-		_showdown.visible = true
-		_showdown.pivot_offset = Vector2(160, 18)
-		_showdown.scale = Vector2(0.94, 0.94)
-		create_tween().tween_property(_showdown, "scale", Vector2.ONE, 0.3).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
-
-
 # ---------------------------------------------------------------- input
 
 func _on_card_tapped(cv: CardView) -> void:
@@ -773,6 +790,7 @@ func _on_drag_started(cv: CardView) -> void:
 	if main.is_busy() or _e.state.phase != Phase.PLAY:
 		return
 	_selected = [cv.card_id]
+	_dragging = true
 	main.sfx.play("card", 0.9)
 	cv.z_index = 60
 	cv.set_selected(false)
@@ -784,14 +802,35 @@ func _on_drag_moved(cv: CardView, pos: Vector2) -> void:
 		return
 	cv.global_position = pos - HAND_CARD / 2 - Vector2(0, 50)
 	cv.rotation = lerpf(cv.rotation, 0.0, 0.3)
-	var over := _drop_zone().has_point(pos)
+	var on_fire := _over_fire(pos)
+	var over := _drop_zone().has_point(pos) and not on_fire
 	for id in _enemy_views:
 		_enemy_views[id].highlight = Style.GOLD if over else Color(0, 0, 0, 0)
+	if _fire.hot != on_fire:
+		_fire.hot = on_fire
+		if on_fire:
+			main.sfx.play("select", 0.8)
+
+
+## True when a dragged card at `pos` is over the burn spot and could burn now.
+func _over_fire(pos: Vector2) -> bool:
+	return _fire.visible and _fire.active and _fire.get_global_rect().grow(16).has_point(pos)
 
 
 func _on_drag_released(cv: CardView, pos: Vector2) -> void:
+	_dragging = false
 	for id in _enemy_views:
 		_enemy_views[id].highlight = Color(0, 0, 0, 0)
+	var on_fire := _over_fire(pos)
+	_fire.hot = false
+	# Burn: drop the card on the fire. It counts this round, then it is gone for good.
+	if on_fire and _e.state.phase == Phase.PLAY and not main.is_busy() and _hand_views.has(cv.card_id):
+		var bid := cv.card_id
+		_hand_views.erase(bid)
+		_selected.clear()
+		_burn_anim(cv)
+		main.act(func(): _e.burn_card(bid))
+		return
 	# Free discard (option): drop the card on the Discard button.
 	if _e.can_discard() and not main.is_busy() and _disc_btn.get_global_rect().grow(30).has_point(pos) and _hand_views.has(cv.card_id):
 		var did := cv.card_id
@@ -818,6 +857,27 @@ func _on_drag_released(cv: CardView, pos: Vector2) -> void:
 	var to := cv.position
 	cv.global_position = from
 	cv.create_tween().tween_property(cv, "position", to, 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+
+## A burned card sinks into the fire: it curls (shrinks and tilts), darkens to ash and is gone.
+func _burn_anim(cv: CardView) -> void:
+	cv.z_index = 60
+	cv.set_interactive(false)
+	cv.breathing = false
+	var center := _fire.get_global_rect().get_center()
+	var tw := cv.create_tween()
+	tw.tween_property(cv, "global_position", center - cv.size / 2 - Vector2(0, 30), 0.16).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.tween_callback(func():
+		main.burst(center, Style.RED, 18)
+		main.burst(center, Style.GOLD, 10))
+	tw.tween_property(cv, "grey", 1.0, 0.35)
+	tw.parallel().tween_property(cv, "modulate", Color(Style.INK, 0.0), 0.45)
+	tw.parallel().tween_property(cv, "scale", Vector2(0.35, 0.35), 0.45).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+	tw.parallel().tween_property(cv, "rotation", 0.5, 0.45)
+	tw.parallel().tween_property(cv, "global_position", center - cv.size * 0.175 + Vector2(0, 10), 0.45)
+	tw.tween_callback(cv.queue_free)
+	main.sfx.play("crack", 0.7)
+	_layout_hand()
 
 
 ## The played card flies to the enemy, taps it, then drops into the discard pile.
@@ -911,12 +971,6 @@ func play_event(ev: Dictionary) -> float:
 			main.toast("Floor " + Style.floor_text(ev["floor"]) if ev["floor"] < 13 else "THE KINGS", Style.GOLD, 420)
 			_reveal_fresh = true
 			return 0.7
-		Ev.JOKER_TRIGGERED:
-			main.toast("JOKER!", Style.RED, 380)
-			main.flash(Color(Style.RED, 0.4))
-			_hint_label.text = ev["desc"]
-			main.sfx.play("hit", 0.7)
-			return 0.9
 		Ev.ENEMY_REVEALED:
 			if _reveal_fresh:
 				_reveal_fresh = false
@@ -973,6 +1027,15 @@ func play_event(ev: Dictionary) -> float:
 					any = true
 			_layout_hand()
 			return 0.3 if any else 0.15
+		Ev.CARD_BURNED:
+			# Dragged cards are already burning; burned another way (tests, bot) they burn here.
+			if _hand_views.has(ev["id"]):
+				var cv: CardView = _hand_views[ev["id"]]
+				_hand_views.erase(ev["id"])
+				_burn_anim(cv)
+			main.toast("BURNED: %d" % int(ev["value"]), Style.RED, 600, 48)
+			main.haptic(1)
+			return 0.5
 		Ev.ACE_SACRIFICED:
 			var c = _find_card(ev["temp_id"])
 			if c != null:
@@ -1052,18 +1115,6 @@ func play_event(ev: Dictionary) -> float:
 					tw.parallel().tween_property(cv, "modulate:a", 0.0, 0.3)
 			main.sfx.play("block", 0.7)
 			return 0.6
-		Ev.LAST_STAND_BLOCKED:
-			main.haptic(1)  # the strike plays out
-			main.toast("STRIKE BLOCKED!", Style.GOLD, 560)
-			main.sfx.play("block")
-			main.shake(6.0)
-			return 0.6
-		Ev.LOCKOUT:
-			main.haptic(2)  # the attack plays out
-			main.toast("LAST STAND!", Style.RED, 520)
-			main.shake(20.0)
-			main.sfx.play("hit", 0.8)
-			return 0.8
 		Ev.ENEMY_DEFEATED:
 			if _enemy_views.has(ev["id"]):
 				var cv: CardView = _enemy_views[ev["id"]]

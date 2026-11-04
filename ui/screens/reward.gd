@@ -1,5 +1,5 @@
 extends Control
-## Between floors: reward pick (with swap when the deck is full), card removal (♣) and red joker attach.
+## Between floors: reward pick (with swap when the deck is full) and card removal (♣).
 
 const Style := preload("res://ui/style.gd")
 const CardView := preload("res://ui/card_view.gd")
@@ -27,7 +27,7 @@ var _deck: HFlowContainer
 var _skip: Button
 var _confirm: Button
 var _opt_sels: Array = []  # selected reward options (card ids), up to the number of picks
-var _deck_sel := -1  # selected deck card (swap target, card to remove, or joker target)
+var _deck_sel := -1  # selected deck card (swap target or card to remove)
 var _opt_views: Dictionary = {}
 var _deck_views: Dictionary = {}
 var _fresh_id := -1  # card that just landed in the deck (gets a pop + glow after refresh)
@@ -125,16 +125,6 @@ func refresh() -> void:
 				cv.land(i * 0.08)
 		Phase.REWARD_REMOVE:
 			_sub.text = "Clubs reward"
-		Phase.JOKER_ATTACH:
-			_title.text = "RED JOKER"
-			_sub.text = _joker_desc()
-			var jv := CardView.new()
-			jv.set_interactive(false)
-			jv.rank = 0
-			jv.suit = "J"
-			jv.setup(null, Vector2(150, 210))
-			_opts.add_child(jv)
-			jv.land()
 	if s.find_in(s.deck, _deck_sel) == null:
 		_deck_sel = -1
 	var cap := int(s.balance["deck_cap"])
@@ -160,13 +150,13 @@ func refresh() -> void:
 	_update_sel()
 
 
-## Deck cards can be picked when swapping (full deck), removing (♣) or attaching the red joker.
+## Deck cards can be picked when swapping (full deck) or removing (♣).
 func _deck_pickable() -> bool:
 	var s = _e.state
 	match s.phase:
 		Phase.REWARD:
 			return _e.removal_needed(_opt_sels.size()) or (_e.deck_full() and not _opt_sels.is_empty())
-		Phase.REWARD_REMOVE, Phase.JOKER_ATTACH:
+		Phase.REWARD_REMOVE:
 			return true
 	return false
 
@@ -203,9 +193,6 @@ func _update_sel() -> void:
 		Phase.REWARD_REMOVE:
 			_prompt.text = "Tap a card in your deck to remove"
 			_set_confirm("Remove %s" % dk.label() if dk != null else "Pick a card to remove", dk != null)
-		Phase.JOKER_ATTACH:
-			_prompt.text = "Tap a card in your deck to attach the joker to"
-			_set_confirm("Attach to %s" % dk.label() if dk != null else "Pick a card", dk != null)
 
 
 ## One action for the whole reward: the cards to take, plus the ♣ removal (or the swap when full).
@@ -300,13 +287,6 @@ func _on_confirm() -> void:
 		Phase.REWARD_REMOVE:
 			await _animate_out(dk)
 			main.act(func(): _e.reward_remove(dk))
-		Phase.JOKER_ATTACH:
-			_fresh_id = dk
-			if _deck_views.has(dk) and _opts.get_child_count() > 0:
-				var jv: Control = _opts.get_child(0)
-				jv.visible = false
-				await main.fly_card(null, jv.get_global_rect(), _deck_views[dk].get_global_rect().position, Vector2(110, 154)).finished
-			main.act(func(): _e.attach_joker(dk))
 	_animating = false
 
 
@@ -358,16 +338,9 @@ func _last_offer() -> Dictionary:
 	return {}
 
 
-func _joker_desc() -> String:
-	for e in _e.state.events:
-		if e["type"] == Ev.JOKER_OFFERED:
-			return e.get("desc", "")
-	return ""
-
-
 func play_event(ev: Dictionary) -> float:
 	match ev["type"]:
-		Ev.REWARD_TAKEN, Ev.CARD_REMOVED, Ev.JOKER_ATTACHED:
+		Ev.REWARD_TAKEN, Ev.CARD_REMOVED:
 			main.sfx.play("reward")
 			return 0.2
 		Ev.LIFE_RESTORED:

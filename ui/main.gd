@@ -42,6 +42,7 @@ var _queue: Array = []
 var _playing := false
 var _shake := 0.0
 var _recorded := false
+var last_record: Dictionary = {}  # Store.record_run() result for the finished run (summary comments)
 
 
 func _ready() -> void:
@@ -156,8 +157,6 @@ func new_run(p_seed: int = -1) -> void:
 	_recorded = false
 	_queue.clear()
 	var opts := {}
-	if settings.get("force_theme", "") != "":
-		opts["force_theme"] = settings["force_theme"]
 	if settings.get("force_mod", "") != "":
 		opts["force_mod"] = settings["force_mod"]
 	engine.start_run(p_seed, balance(), opts)
@@ -229,7 +228,7 @@ func _screen_for_phase() -> String:
 			return "reveal"
 		Phase.PLAY, Phase.RETAIN:
 			return "combat"
-		Phase.REWARD, Phase.REWARD_REMOVE, Phase.JOKER_ATTACH:
+		Phase.REWARD, Phase.REWARD_REMOVE:
 			return "reward"
 	return "summary"
 
@@ -261,7 +260,7 @@ func route() -> void:
 	var target := _screen_for_phase()
 	if target == "summary" and not _recorded:
 		_recorded = true
-		Store.record_run(engine.state)
+		last_record = Store.record_run(engine.state)
 	show_screen(target)
 	if screen and screen.has_method("refresh"):
 		screen.refresh()
@@ -416,9 +415,6 @@ func fly_card(card, from: Rect2, to_pos: Vector2, to_size: Vector2, dur: float =
 	var cv = load("res://ui/card_view.gd").new()
 	cv.set_interactive(false)
 	cv.breathing = false
-	if card == null:  # the red joker
-		cv.rank = 0
-		cv.suit = "J"
 	cv.setup(card, from.size)
 	cv.position = from.position
 	cv.z_index = 97

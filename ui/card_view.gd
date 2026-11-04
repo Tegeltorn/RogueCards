@@ -8,13 +8,10 @@ signal drag_moved(view, global_pos: Vector2)
 signal drag_released(view, global_pos: Vector2)
 
 const Style := preload("res://ui/style.gd")
-const JOKER_TAG := {"dual": "♥♠", "innate": "1st", "double": "x2", "draw2": "+2"}
 
 var card_id: int = -1
 var rank: int = 2
 var suit: String = "S"
-var joker: String = ""
-var virtual := false  # enemy card made by the black joker (e.g. attack 14): not an ace
 var face_up := true
 var selected := false
 var dimmed := false
@@ -52,8 +49,6 @@ func setup(c, p_size: Vector2 = Vector2(130, 182)) -> Control:
 		card_id = c.id
 		rank = c.rank
 		suit = c.suit
-		joker = c.joker
-		virtual = c.from_joker
 	custom_minimum_size = p_size
 	size = p_size
 	pivot_offset = p_size / 2
@@ -241,12 +236,8 @@ func _clip_line(r: Rect2, p: Vector2, dir: Vector2, col: Color) -> void:
 
 func _draw_face(r: Rect2, a: float) -> void:
 	var col := Style.suit_color(suit)
-	if suit == "J":
-		col = Style.BLACK
 	col.a = a
 	var paper := Style.PAPER
-	if joker != "":
-		paper = paper.lerp(Style.GOLD.lightened(0.5), 0.35)
 	paper.a = a
 	var rad := _radius()
 	draw_style_box(Style.box(paper, Color(Style.INK, 0.55 * a), 1 if size.x < 100 else 2, rad), r)
@@ -254,7 +245,7 @@ func _draw_face(r: Rect2, a: float) -> void:
 	if w >= 100:
 		_frame(r, w * 0.055, Color(Style.GOLD, 0.55 * a))
 	var f := Style.bold()
-	var rt := str(rank) if virtual else Style.rank_text(rank)
+	var rt := Style.rank_text(rank)
 	var fs := int(w * 0.27)
 	var corner := r.position + Vector2(w * 0.1, fs * 0.98)
 	draw_string(f, corner, rt, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, col)
@@ -270,18 +261,8 @@ func _draw_face(r: Rect2, a: float) -> void:
 		var big := int(w * 0.46)
 		draw_string(Style.display(), Vector2(-w / 2, big * 0.28), rt, HORIZONTAL_ALIGNMENT_CENTER, w, big, col)
 		_draw_suit(Vector2(0, r.size.y * 0.25), w * 0.18, suit, col)
-	elif virtual:
-		# The black joker's attack / shield: a smaller pip and a "Joker" caption clear of the corner value.
-		_draw_suit(Vector2(0, -r.size.y * 0.06), w * 0.34, suit, col)
-		draw_string(Style.display(), Vector2(-w / 2, r.size.y * 0.2), "Joker", HORIZONTAL_ALIGNMENT_CENTER, w, int(w * 0.15), col)
 	else:
-		_draw_suit(Vector2(0, 4), w * (0.48 if rank == 14 or suit == "J" else 0.38), suit, col)
-		if suit == "J":
-			draw_string(Style.display(), Vector2(-w / 2, r.size.y * 0.36), "Joker", HORIZONTAL_ALIGNMENT_CENTER, w, int(w * 0.15), col)
-	if joker != "":
-		var band := Rect2(r.position.x + 10, r.end.y - 36, r.size.x - 20, 26)
-		draw_style_box(Style.box(Color(Style.GOLD, a), Color(Style.INK, 0.4 * a), 1, 8), band)
-		draw_string(Style.font(), band.position + Vector2(0, 20), "★ " + JOKER_TAG.get(joker, joker), HORIZONTAL_ALIGNMENT_CENTER, band.size.x, 19, Color(Style.ON_DARK if Style.is_dark(Style.GOLD) else Style.INK, a))
+		_draw_suit(Vector2(0, 4), w * (0.48 if rank == 14 else 0.38), suit, col)
 
 
 ## A jagged crack from the left edge to the right edge, with two branches. It grows along its

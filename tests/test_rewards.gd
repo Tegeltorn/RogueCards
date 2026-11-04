@@ -129,20 +129,16 @@ func test_deck_cap_requires_swap() -> void:
 	check(not e.state.deck.has(out), "swapped out")
 
 
-func test_red_joker_after_jack_floor() -> void:
-	var e := scenario([], ["11S"], {}, {"force_theme": "S"})
+func test_no_joker_step_after_jack_floor() -> void:
+	var e := scenario([], ["11S"])
 	e.state.floor_num = 11
 	e.state.hand = cards(e, ["14H"])
 	e.state.deck = cards(e, ["2H", "2D", "2S", "2C"])
 	e.play_cards([e.state.hand[0].id])
 	e.resolve()
 	e.reward_take(e.state.reward["options"][0].id)
-	eq(e.state.phase, Phase.JOKER_ATTACH, "joker offered")
-	var target = e.state.deck[0]
-	e.attach_joker(target.id)
-	eq(target.joker, "double", "spade theme = double")
-	eq(target.value(), 4, "2 doubled")
-	eq(e.state.floor_num, 12, "next floor")
+	eq(e.state.floor_num, 12, "straight on to the queens")
+	eq(e.state.phase, Phase.PLAY, "fighting")
 
 
 func test_reward_resolve_clubs_take_and_remove_at_once() -> void:

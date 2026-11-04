@@ -7,12 +7,11 @@ const SimLib := preload("res://sim/sim_lib.gd")
 const Balance := preload("res://engine/balance.gd")
 
 const GRID := {
+	"burn_mode": ["double", "swap"],
+	"burn_limit": [0, 1],
+	"perfect_draw": [0, 1],
+	"overpower_draw": [0, 1],
 	"lives": [2, 3],
-	"hand_size": [3, 4],
-	"retain": [0, 1],
-	"deck_cap": [4, 5, 6],
-	"graded_threshold": [4, 5],
-	"short_floors": [[3, 4, 5], []],
 }
 
 
@@ -21,7 +20,8 @@ func _init() -> void:
 	var runs := int(args.get("runs", "600"))
 	var final_runs := int(args.get("final-runs", "5000"))
 	var top_n := int(args.get("top", "6"))
-	var spec_raw := Balance.load_json("res://config/presets/spec.json")
+	# Sweeps around the current balance.json ("base"); --preset compares against another file.
+	var spec_raw := Balance.load_json(args.get("preset", Balance.BALANCE_PATH))
 	var spec := Balance.make(spec_raw)
 	var band: Array = spec["target"]["bot_win_rate_band"]
 	var lo := float(band[0]) * 100.0
@@ -61,12 +61,10 @@ func _init() -> void:
 	for r in scored.slice(0, top_n):
 		var st := SimLib.run_batch(Balance.make(_merge(spec_raw, r["cfg"])), final_runs, 1)
 		var w := SimLib.win_rate(st)
-		var min_theme := 100.0
 		var min_mod := 100.0
 		for s in SimLib.SUITS:
-			min_theme = minf(min_theme, SimLib.pct(st["theme"][s][0], st["theme"][s][1]))
 			min_mod = minf(min_mod, SimLib.pct(st["mod"][s][0], st["mod"][s][1]))
-		var ok := w >= lo and w <= hi and min_theme >= 10.0 and min_mod >= 10.0
+		var ok := w >= lo and w <= hi and min_mod >= 10.0
 		lines.append("")
 		lines.append(SimLib.format_report("%s %s" % ["✅" if ok else "❌", _diff(r["cfg"], spec)], st))
 		if ok and best == null:
@@ -94,4 +92,4 @@ func _diff(c: Dictionary, spec: Dictionary) -> String:
 	for k in c:
 		if str(c[k]) != str(spec[k]):
 			parts.append("%s=%s" % [k, JSON.stringify(c[k])])
-	return "spec values" if parts.is_empty() else ", ".join(parts)
+	return "base values" if parts.is_empty() else ", ".join(parts)
