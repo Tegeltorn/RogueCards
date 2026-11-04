@@ -759,6 +759,19 @@ func _on_drag_moved(cv: CardView, pos: Vector2) -> void:
 func _on_drag_released(cv: CardView, pos: Vector2) -> void:
 	for id in _enemy_views:
 		_enemy_views[id].highlight = Color(0, 0, 0, 0)
+	# Free discard (option): drop the card on the Discard button.
+	if _e.can_discard() and not main.is_busy() and _disc_btn.get_global_rect().grow(30).has_point(pos) and _hand_views.has(cv.card_id):
+		var did := cv.card_id
+		_hand_views.erase(did)
+		_selected.clear()
+		var tw := cv.create_tween()
+		tw.tween_property(cv, "global_position", _disc_btn.get_global_rect().get_center() - cv.size / 2, 0.2)
+		tw.parallel().tween_property(cv, "scale", Vector2(0.3, 0.3), 0.2)
+		tw.tween_callback(cv.queue_free)
+		main.sfx.play("draw")
+		main.act(func(): _e.discard_card(did))
+		_layout_hand()
+		return
 	if _e.state.phase == Phase.PLAY and not main.is_busy() and _drop_zone().has_point(pos) and _hand_views.has(cv.card_id):
 		var id := cv.card_id
 		_hand_views.erase(id)

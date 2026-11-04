@@ -6,8 +6,8 @@ const MODS_PATH := "res://config/mods.json"
 const JOKERS_PATH := "res://config/jokers.json"
 
 const INT_KEYS := ["first_floor", "start_pick_rank", "start_pick_offer", "start_pick_take", "hand_size", "boss_hand_size", "retain", "deck_cap", "deck_min", "lives",
-	"graded_threshold", "club_pair_bonus", "overpower_multiplier", "overpower_draw", "ace_value", "joker_curse_value", "red_joker_after_floor"]
-const BOOL_KEYS := ["keep_hand", "ace_sac_enabled", "ace_sac_own_color", "ace_sac_suit_effects",
+	"graded_threshold", "club_pair_bonus", "overpower_multiplier", "overpower_draw", "min_draw", "ace_value", "joker_curse_value", "red_joker_after_floor"]
+const BOOL_KEYS := ["keep_hand", "reward_optional", "free_discard", "ace_sac_enabled", "ace_sac_own_color", "ace_sac_suit_effects",
 	"mods_enabled", "jokers_enabled"]
 
 static var _cache: Dictionary = {}

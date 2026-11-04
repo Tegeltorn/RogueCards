@@ -192,7 +192,9 @@ func _next_round() -> void:
 		state.hand = state.retained
 	state.retained = []
 	var limit := int(state.balance["boss_hand_size"] if state.is_boss() else state.balance["hand_size"])
-	while state.hand.size() < limit:
+	# Draw up to the hand size, but always at least `min_draw` cards.
+	var to_draw := maxi(limit - state.hand.size(), int(state.balance.get("min_draw", 0)))
+	for i in to_draw:
 		var d = _draw_one()
 		if d == null:
 			break
@@ -471,6 +473,23 @@ func play_cards(ids: Array) -> bool:
 	return true
 
 
+## Free discard: throw an unplayed card on the discard pile (no effect). Only with free_discard on.
+func can_discard() -> bool:
+	return state.phase == Phase.PLAY and bool(state.balance.get("free_discard", false))
+
+
+func discard_card(card_id: int) -> bool:
+	if not can_discard():
+		return false
+	var c = state.find_in(state.hand, card_id)
+	if c == null:
+		return false
+	state.hand.erase(c)
+	state.discard.append(c)
+	_emit(Ev.CARD_DISCARDED, {"card": c.label(), "id": c.id})
+	return true
+
+
 func sacrifice_ace(ace_id: int) -> bool:
 	var a = state.find_in(sacrificable_aces(), ace_id)
 	if a == null:
@@ -643,8 +662,10 @@ func _floor_cleared() -> void:
 	_after_pick()
 
 
+## deck_cap 0 = no cap.
 func deck_full() -> bool:
-	return state.deck.size() >= int(state.balance["deck_cap"])
+	var cap := int(state.balance["deck_cap"])
+	return cap > 0 and state.deck.size() >= cap
 
 
 ## Take a reward option. When the deck is full, `replace_id` names the deck card to swap out.
@@ -672,7 +693,7 @@ func reward_take(option_id: int, replace_id: int = -1) -> bool:
 
 ## Declining is only allowed when the deck is full (spec: swap or decline).
 func can_decline() -> bool:
-	return deck_full()
+	return deck_full() or bool(state.balance.get("reward_optional", false))
 
 
 ## Decline the rest of the reward.

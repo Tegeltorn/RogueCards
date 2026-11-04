@@ -126,7 +126,8 @@ func refresh() -> void:
 			jv.land()
 	if s.find_in(s.deck, _deck_sel) == null:
 		_deck_sel = -1
-	_deck_label.text = "Your deck (%d/%d)" % [s.deck.size(), int(s.balance["deck_cap"])]
+	var cap := int(s.balance["deck_cap"])
+	_deck_label.text = "Your deck (%d/%d)" % [s.deck.size(), cap] if cap > 0 else "Your deck (%d cards)" % s.deck.size()
 	var sorted: Array = s.deck.duplicate()
 	sorted.sort_custom(func(a, b): return a.suit < b.suit or (a.suit == b.suit and a.rank < b.rank))
 	for c in sorted:

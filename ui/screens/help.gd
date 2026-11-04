@@ -88,7 +88,7 @@ Tip: select a single card to see what it does.
 %s  Your aces at the bottom. Tap them to see them, or to sacrifice one: you lose that life and it counts as %d this round.
 
 %s  A shield with no black enemy cards left behind it is a last stand: fail to break it and you lose a life.
-%s  The suit of the last beaten card decides: ♠ pick any beaten card · ♣ reveal 2, take 1, remove 1 · ♥ heal a life · ♦ reveal 2, take both. Your deck holds up to %d cards; when it is full you swap or decline.
+%s  The suit of the last beaten card decides: ♠ pick any beaten card · ♣ reveal 2, take 1, remove 1 · ♥ heal a life · ♦ reveal 2, take both. %s
 %s  Floors go %d to Queen, then the three kings (%d cards in hand). Tap the king at the top to see your mod and the jokers (the red joker arrives after the Jack floor).""" % [
 		H % "EACH ROUND", int(b["hand_size"]),
 		H % "SUITS", str(b["spade_multiplier"]), int(b["club_pair_bonus"]),
@@ -97,7 +97,7 @@ Tip: select a single card to see what it does.
 		H % "SHIELD",
 		H % "LIVES", int(b["ace_value"]),
 		H % "LAST STAND",
-		H % "REWARDS", int(b["deck_cap"]),
+		H % "REWARDS", ("You may decline any card to keep your deck lean." if int(b["deck_cap"]) <= 0 else "Your deck holds up to %d cards; when it is full you swap or decline." % int(b["deck_cap"])),
 		H % "THE ROAD", int(b.get("first_floor", 4)), int(b["boss_hand_size"])]
 	var v := VBoxContainer.new()
 	var scroll := ScrollContainer.new()

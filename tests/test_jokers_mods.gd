@@ -69,7 +69,7 @@ func test_boss_hand_size() -> void:
 	var e := scenario([], ["4S"])
 	e.state.deck = cards(e, ["2H", "2D", "2S", "2C", "5C"])
 	e._start_floor(13)
-	eq(e.state.hand.size(), 2, "boss hand 2")
+	eq(e.state.hand.size(), 3, "boss hand 3")
 
 
 func test_win_after_boss() -> void:

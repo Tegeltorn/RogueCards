@@ -44,7 +44,7 @@ The suit of the **last beaten enemy card** decides the reward. You choose among 
 | ♥ | Get one lost life back. With all lives: reveal 2 and take 1. |
 | ♦ | Reveal 2 and take both. |
 
-If your deck has fewer than `deck_cap` cards you must add the new card. When it is full, swap a card out for the new one or decline. Your deck can never shrink below `deck_min` cards.
+Your deck has no size limit (`deck_cap` 0), and you may decline any reward card (`reward_optional`) to keep your deck lean. With a `deck_cap`, you must add cards until the deck is full; then swap a card out for the new one or decline. Your deck can never shrink below `deck_min` cards.
 
 ## Jokers and the kings
 | Theme | Red joker (after the Jack floor: put it under any card in your deck) | Black joker (in the boss pile) |
@@ -72,11 +72,12 @@ A test keeps these values in sync with `config/balance.json`.
 | `first_floor` | 4 | First enemy floor |
 | `start_pick_offer` | 3 | Threes revealed at the start |
 | `start_pick_take` | 1 | Threes you keep |
-| `hand_size` | 3 | Hand size |
-| `boss_hand_size` | 2 | Hand size against the kings |
+| `hand_size` | 4 | Hand size |
+| `boss_hand_size` | 3 | Hand size against the kings |
 | `keep_hand` | true | Unplayed cards stay in hand between rounds |
 | `retain` | 1 | Cards you may keep (only when `keep_hand` is off) |
-| `deck_cap` | 9 | Max cards in your deck |
+| `deck_cap` | 0 | Max cards in your deck (0 = no limit) |
+| `reward_optional` | true | You may always decline a reward card |
 | `deck_min` | 4 | Min cards in your deck |
 | `lives` | 3 | Number of life aces |
 | `short_floors` | [4,5] | Floors with only 3 enemies |

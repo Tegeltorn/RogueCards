@@ -63,8 +63,11 @@ func test_deck_min_blocks_removal() -> void:
 
 
 func test_decline_only_when_full() -> void:
-	var e := _clear_with("3S", ["2H", "2D", "2S", "2C"], {"deck_cap": 9}, ["3H"])
+	var e := _clear_with("3S", ["2H", "2D", "2S", "2C"], {"deck_cap": 9, "reward_optional": false}, ["3H"])
 	check(not e.reward_skip(), "cannot decline below cap")
+	var g := _clear_with("3S", ["2H", "2D", "2S", "2C"], {"deck_cap": 0, "reward_optional": true}, ["3H"])
+	check(not g.deck_full(), "no cap: never full")
+	check(g.reward_skip(), "optional rewards: may decline")
 	var f := _clear_with("3S", ["2H", "2D", "2S", "2C", "3D"], {"deck_cap": 5}, ["3H"])
 	check(f.reward_skip(), "can decline at cap")
 

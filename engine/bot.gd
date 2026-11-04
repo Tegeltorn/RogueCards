@@ -104,7 +104,22 @@ func _play_thrifty(e) -> void:
 				if a.base_red() or not s.balance["ace_sac_own_color"]:
 					e.sacrifice_ace(a.id)
 					break
+	# Free discard: drop below-average unplayed cards so the refill can bring better ones.
+	if e.can_discard():
+		var avg := _deck_avg(s)
+		for c in s.hand.duplicate():
+			if c.joker == "" and c.value() < avg:
+				e.discard_card(c.id)
 	e.resolve()
+
+
+static func _deck_avg(s) -> float:
+	if s.deck.is_empty():
+		return 0.0
+	var t := 0
+	for d in s.deck:
+		t += d.value()
+	return float(t) / s.deck.size()
 
 
 ## Smallest-value subset of `cards` that reaches the need (full = true) or that keeps a block miss
@@ -163,7 +178,11 @@ func _reward(e) -> void:
 	var opts: Array = s.reward["options"]
 	var c = opts[0] if s.reward["suit"] == "D" and int(s.reward["picks"]) >= 2 else _best(s, opts)
 	if not e.deck_full():
-		e.reward_take(c.id)
+		# Optional rewards: only add cards that raise the deck's average value.
+		if e.can_decline() and c.rank < _deck_avg(s):
+			e.reward_decline(c.id)
+		else:
+			e.reward_take(c.id)
 		return
 	var same: Array = []
 	for d in s.deck:

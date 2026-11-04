@@ -230,3 +230,15 @@ func test_overpower_counts_cards_played_separately() -> void:
 		if ev["type"] == Ev.OVERPOWER:
 			count += 1
 	eq(count, 1, "only once per round")
+
+
+func test_min_draw_and_free_discard() -> void:
+	var e := scenario(["2H", "5S", "6S"], ["3S"], {"hand_size": 3, "min_draw": 1, "free_discard": true}, {"pile": ["4S"]})
+	e.state.draw_pile = cards(e, ["9D", "8D"])
+	check(e.discard_card(e.state.hand[1].id), "free discard")
+	eq(e.state.hand.size(), 2, "card left the hand")
+	e.play_cards([e.state.hand[0].id])
+	e.resolve()
+	eq(e.state.hand.size(), 3, "6♠ kept + drew 2 (fill to 3, min 1)")
+	var f := scenario(["2H"], ["3S"], {"free_discard": false})
+	check(not f.discard_card(f.state.hand[0].id), "discard off by default")
