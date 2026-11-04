@@ -179,14 +179,18 @@ func _build() -> void:
 	_total_label.add_theme_font_size_override("normal_font_size", 60)
 	add_child(_total_label)
 	_showdown = PanelContainer.new()
-	_showdown.add_theme_stylebox_override("panel", Style.box(Color(Style.RED.darkened(0.15), 0.96), Style.GOLD, 2, 12))
+	var tab := Style.box(Color(Style.RED.darkened(0.15), 0.94), Style.GOLD, 1, 10)
+	tab.content_margin_top = 4
+	tab.content_margin_bottom = 4
+	_showdown.add_theme_stylebox_override("panel", tab)
 	_showdown.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_showdown_label = RichTextLabel.new()
 	_showdown_label.bbcode_enabled = true
 	_showdown_label.fit_content = true
 	_showdown_label.scroll_active = false
 	_showdown_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_showdown_label.add_theme_font_size_override("normal_font_size", 22)
+	_showdown_label.add_theme_font_size_override("normal_font_size", 20)
+	_showdown_label.autowrap_mode = TextServer.AUTOWRAP_OFF
 	_showdown.add_child(_showdown_label)
 	_showdown.visible = false
 	_showdown.z_index = 20
@@ -281,9 +285,10 @@ func _layout() -> void:
 	_total_label.position = Vector2(0, ty)
 	_total_label.size = Vector2(W, 80)
 	_total_label.pivot_offset = Vector2(W / 2, 40)
-	_showdown.position = Vector2(W / 2 - 230, ey + ENEMY_CARD.y - 96)
+	# A slim tab on the top edge of the enemy card, clear of the totals below it.
+	_showdown.position = Vector2(W / 2 - 160, ey - 24)
 	_finish_tip.position = Vector2(12, ey + 20)
-	_showdown.size = Vector2(460, 0)
+	_showdown.size = Vector2(320, 0)
 	_need_label.position = Vector2(0, ty + 72)
 	_need_label.size = Vector2(W, 30)
 	_carry_label.position = Vector2(0, ty + 100)
@@ -675,12 +680,6 @@ func _update_total() -> void:
 			main.sfx.play("select", 1.4)
 
 
-const SHOWDOWN_FLAVOUR := [
-	"The enemy is cornered and fighting for its life.",
-	"No allies left. It is a desperate last stand.",
-	"Final showdown: it won't go down quietly.",
-	"Its back is against the wall, and it is getting desperate.",
-]
 
 
 ## Red ribbon over the enemy when failing this shield would cost a life (no black enemy cards left).
@@ -723,11 +722,10 @@ func _update_showdown() -> void:
 	if not risk:
 		_showdown.visible = false
 		return
-	var flavour: String = SHOWDOWN_FLAVOUR[int(s.current[0].id) % SHOWDOWN_FLAVOUR.size()]
-	_showdown_label.text = "[center][font_size=30][color=%s]LAST STAND![/color][/font_size]\n[color=%s]%s\nBreak the shield or block its strike, or you lose a life.[/color][/center]" % [Style.hex(Style.GOLD.lightened(0.35)), Style.hex(Style.ON_DARK), flavour]
+	_showdown_label.text = "[center][color=%s]LAST STAND[/color]  [color=%s]break it or block its strike[/color][/center]" % [Style.hex(Style.GOLD.lightened(0.35)), Style.hex(Style.ON_DARK)]
 	if not _showdown.visible:
 		_showdown.visible = true
-		_showdown.pivot_offset = Vector2(230, 50)
+		_showdown.pivot_offset = Vector2(160, 18)
 		_showdown.scale = Vector2(0.94, 0.94)
 		create_tween().tween_property(_showdown, "scale", Vector2.ONE, 0.3).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 
