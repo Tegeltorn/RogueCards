@@ -291,15 +291,17 @@ func _layout() -> void:
 	var by := H - 106
 	# Lives sit in the bottom bar between the draw pile and the main button.
 	_lives_box.position = Vector2(132, by + 2)
-	_lives_caption.position = Vector2(132, by - 22)
-	_lives_caption.size = Vector2(180, 22)
+	# Caption sits clear of the sacrifice highlight drawn around the aces (it grows ~9 px outside them).
+	_lives_caption.position = Vector2(134, by - 33)
+	_lives_caption.size = Vector2(180, 24)
+	_lives_caption.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
 	_draw_btn.position = Vector2(14, by)
 	_disc_btn.position = Vector2(W - 124, by)
 	# Bottom bar: Draw | lives | Play | End turn | Discard
 	var lives_w := 132.0 + maxi(3, _e.state.max_lives if _e else 3) * (MINI.x + 6)
 	_main_btn.position = Vector2(lives_w + 2, by - 6)
 	_main_btn.size = Vector2(W - 124 - 8 - lives_w - 2, 92)
-	var hy := by - HAND_CARD.y - 40
+	var hy := by - HAND_CARD.y - 58
 	_hand_layer.position = Vector2(0, hy)
 	_hand_layer.size = Vector2(W, HAND_CARD.y)
 	_hint_label.position = Vector2(0, hy - 46)
