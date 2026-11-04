@@ -46,6 +46,11 @@ func _run() -> void:
 				main.act(func(): bot.step(main.engine))
 			await _wait(main)
 			steps += 1
+			# The saved run must replay to the same state (resume after a reload).
+			var copy = load("res://engine/engine.gd").new()
+			if not copy.restore(main.engine.snapshot()):
+				push_error("saved run does not replay at step %d" % steps)
+				errors += 1
 			if main.screen_name != main._screen_for_phase():
 				push_error("screen %s does not match phase %s" % [main.screen_name, main.engine.state.phase_name()])
 				errors += 1
@@ -53,6 +58,22 @@ func _run() -> void:
 		print("run %d: %s on floor %d after %d steps" % [r, main.engine.state.result, main.engine.state.floor_num, steps])
 		if main.engine.state.result == "":
 			errors += 1
+	# Resume: a run saved mid-fight comes back on start (as after the page reloads).
+	main.new_run(7)
+	await _wait(main)
+	main.act(func(): bot.step(main.engine))
+	await _wait(main)
+	var want: String = main.engine.fingerprint()
+	var again = load("res://ui/main.tscn").instantiate()
+	root.add_child(again)
+	await _wait(again)
+	if again.engine == null or again.engine.fingerprint() != want or again.screen_name != again._screen_for_phase():
+		push_error("unfinished run was not resumed")
+		errors += 1
+	again.quit_to_menu()
+	await create_timer(1.0).timeout  # let its screen fade-out tweens finish
+	again.queue_free()
+	await process_frame
 	main.open_log()
 	await _shot(main, "log")
 	main.open_stats()

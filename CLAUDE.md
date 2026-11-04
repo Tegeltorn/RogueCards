@@ -26,6 +26,7 @@ xvfb-run -a -s "-screen 0 800x1400x24" godot --path . --resolution 720x1280 --re
 
 ## Architecture rules
 - `engine/` is pure logic (`RefCounted`, no nodes or UI). All state lives in `GameState`. All randomness goes through `engine/rng.gd` (seeded).
+- Save & resume: every player action is a thin wrapper `func x(...): return _act("x", [...])` around `_do_x()`, so it is journaled; `engine.snapshot()`/`restore()` replay seed + journal. New actions must follow this pattern (`tests/test_save.gd`). The UI saves after each action (`user://run.save`) and resumes on start. On the web, a script in `html/head_include` reloads the page if WebGL is lost or the game stops beating (`window.rcBeat`) after switching apps.
 - Each engine action emits events (`engine/events.gd`). The UI (`ui/main.gd`) replays them in order through the active screen's `play_event()`, then calls `refresh()` to sync with the state.
 - All numbers live in `config/balance.json`. Mods are in `config/mods.json` + `engine/mods/*.gd` (hooks in `mod_base.gd`). Jokers are in `config/jokers.json` + `engine/engine.gd` (`_black_joker`, card `joker` field).
 - Use `preload` consts, not `class_name`. Don't name a const `Engine`, it shadows the Godot singleton.

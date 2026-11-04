@@ -87,7 +87,11 @@ func _ready() -> void:
 	# Every button and toggle plucks the harp when pressed (cards use paper sounds instead).
 	get_tree().node_added.connect(_on_node_added)
 	apply_settings()
-	show_screen("menu")
+	if OS.has_feature("web"):
+		_start_heartbeat()
+	# A run left unfinished (closed tab, or the page reloaded after the phone dropped the graphics) goes on.
+	if not resume_run():
+		show_screen("menu")
 
 
 func _process(delta: float) -> void:
@@ -158,7 +162,45 @@ func new_run(p_seed: int = -1) -> void:
 		opts["force_mod"] = settings["force_mod"]
 	engine.start_run(p_seed, balance(), opts)
 	_queue.clear()  # setup events are shown by the reveal screen itself
+	_save_run()
 	route()
+
+
+## Continues the saved unfinished run, if there is one that still replays (see engine.restore()).
+func resume_run() -> bool:
+	var snap := Store.saved_run()
+	if snap.is_empty():
+		return false
+	var e := GameEngine.new()
+	if not e.restore(snap) or e.state.result != "":
+		Store.clear_run()
+		return false
+	engine = e
+	engine.event_emitted.connect(_on_event)
+	_recorded = false
+	_queue.clear()
+	route()
+	return true
+
+
+## Saves the run after every action, so nothing is lost if the page or app is closed or reloaded.
+func _save_run() -> void:
+	if engine == null:
+		return
+	if engine.state.result != "":
+		Store.clear_run()
+	else:
+		Store.save_run(engine.snapshot())
+
+
+## Web: tells the page the game is alive (window.rcBeat). The page's watchdog (export_presets.cfg,
+## html/head_include) reloads the game if it stays silent after coming back from another app.
+func _start_heartbeat() -> void:
+	var t := Timer.new()
+	t.wait_time = 1.0
+	t.timeout.connect(func(): JavaScriptBridge.eval("window.rcBeat = Date.now();", true))
+	add_child(t)
+	t.start()
 
 
 ## Run an engine action, then replay the events it produced.
@@ -167,6 +209,7 @@ func act(fn: Callable) -> void:
 		return
 	_playing = true
 	fn.call()
+	_save_run()
 	# Entering the fight: switch first so the fight screen animates the floor start and the deal.
 	if _screen_for_phase() == "combat" and screen_name != "combat":
 		show_screen("combat")
@@ -244,6 +287,7 @@ func show_screen(name: String) -> void:
 
 func quit_to_menu() -> void:
 	engine = null
+	Store.clear_run()
 	_queue.clear()
 	show_screen("menu")
 

@@ -5,6 +5,7 @@ extends RefCounted
 const OVERRIDES := "user://balance_override.json"
 const SETTINGS := "user://settings.json"
 const STATS := "user://stats.json"
+const RUN := "user://run.save"  # the unfinished run (engine snapshot), resumed on start
 
 
 static func read(path: String, fallback: Dictionary = {}) -> Dictionary:
@@ -75,3 +76,23 @@ static func record_run(state) -> void:
 
 static func reset_stats() -> void:
 	write(STATS, {})
+
+
+## The saved unfinished run, or {} when there is none. Stored with var_to_str so ints stay ints.
+static func saved_run() -> Dictionary:
+	if not FileAccess.file_exists(RUN):
+		return {}
+	var d = str_to_var(FileAccess.get_file_as_string(RUN))
+	return d if typeof(d) == TYPE_DICTIONARY else {}
+
+
+static func save_run(snap: Dictionary) -> void:
+	var f := FileAccess.open(RUN, FileAccess.WRITE)
+	if f:
+		f.store_string(var_to_str(snap))
+		f.close()  # closing flushes it to browser storage on the web build
+
+
+static func clear_run() -> void:
+	if FileAccess.file_exists(RUN):
+		DirAccess.remove_absolute(RUN)

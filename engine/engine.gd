@@ -24,6 +24,13 @@ var mod: ModBase
 var record_events := true  # the simulator turns this off for speed
 var _excluded: Dictionary = {}  # rank -> Array of suits taken by the start pick (removed from that floor)
 var _boss_pile: Array = []
+## Every player action taken this run, as [name, args]. With the seed this rebuilds the run exactly
+## (the engine is deterministic), so the UI can save a run and resume it after a reload.
+var journal: Array = []
+var _start: Dictionary = {}
+var _depth := 0  # > 0 while an action runs (actions calling actions are not journaled twice)
+
+const SAVE_VERSION := 1
 
 
 # ---------------------------------------------------------------- setup
@@ -32,6 +39,9 @@ var _boss_pile: Array = []
 func start_run(p_seed: int, balance: Dictionary = {}, options: Dictionary = {}) -> void:
 	state = GameState.new()
 	rng = Rng.new(p_seed)
+	journal = []
+	_depth = 0
+	_start = {"seed": p_seed, "balance": balance.duplicate(true), "options": options.duplicate(true)}
 	_excluded = {}
 	state.seed_value = p_seed
 	state.balance = Balance.normalise(balance.duplicate(true)) if not balance.is_empty() else Balance.make()
@@ -107,6 +117,10 @@ func first_floor() -> int:
 
 
 func setup_pick(card_id: int) -> bool:
+	return _act("setup_pick", [card_id])
+
+
+func _do_setup_pick(card_id: int) -> bool:
 	if state.phase != Phase.SETUP_PICK:
 		return false
 	var c = state.find_in(state.setup_options, card_id)
@@ -124,6 +138,10 @@ func setup_pick(card_id: int) -> bool:
 
 
 func ack_reveal() -> bool:
+	return _act("ack_reveal", [])
+
+
+func _do_ack_reveal() -> bool:
 	if state.phase != Phase.REVEAL:
 		return false
 	_start_floor(state.floor_num)
@@ -436,6 +454,10 @@ func preview(selected_ids: Array) -> Dictionary:
 
 ## Moves cards from hand to the table. ♦ and draw2 cards draw immediately.
 func play_cards(ids: Array) -> bool:
+	return _act("play_cards", [ids])
+
+
+func _do_play_cards(ids: Array) -> bool:
 	if state.phase != Phase.PLAY:
 		return false
 	var cards: Array = []
@@ -484,6 +506,10 @@ func can_discard() -> bool:
 
 
 func discard_card(card_id: int) -> bool:
+	return _act("discard_card", [card_id])
+
+
+func _do_discard_card(card_id: int) -> bool:
 	if not can_discard():
 		return false
 	var c = state.find_in(state.hand, card_id)
@@ -496,6 +522,10 @@ func discard_card(card_id: int) -> bool:
 
 
 func sacrifice_ace(ace_id: int) -> bool:
+	return _act("sacrifice_ace", [ace_id])
+
+
+func _do_sacrifice_ace(ace_id: int) -> bool:
 	var a = state.find_in(sacrificable_aces(), ace_id)
 	if a == null:
 		return false
@@ -513,6 +543,10 @@ func sacrifice_ace(ace_id: int) -> bool:
 
 ## Ends the play step and resolves the round.
 func resolve() -> bool:
+	return _act("resolve", [])
+
+
+func _do_resolve() -> bool:
 	if state.phase != Phase.PLAY:
 		return false
 	var t := compute(state.played)
@@ -608,6 +642,10 @@ func keep_hand() -> bool:
 
 
 func retain(ids: Array) -> bool:
+	return _act("retain", [ids])
+
+
+func _do_retain(ids: Array) -> bool:
 	if state.phase != Phase.RETAIN:
 		return false
 	if ids.size() > retain_limit():
@@ -705,6 +743,10 @@ func deck_full() -> bool:
 
 ## Take a reward option. When the deck is full, `replace_id` names the deck card to swap out.
 func reward_take(option_id: int, replace_id: int = -1) -> bool:
+	return _act("reward_take", [option_id, replace_id])
+
+
+func _do_reward_take(option_id: int, replace_id: int = -1) -> bool:
 	if state.phase != Phase.REWARD:
 		return false
 	var opts: Array = state.reward["options"]
@@ -733,6 +775,10 @@ func can_decline() -> bool:
 
 ## Decline the rest of the reward.
 func reward_skip() -> bool:
+	return _act("reward_skip", [])
+
+
+func _do_reward_skip() -> bool:
 	if state.phase != Phase.REWARD or not can_decline():
 		return false
 	state.reward["picks"] = 0
@@ -743,6 +789,10 @@ func reward_skip() -> bool:
 
 ## Decline a single option (uses up one pick), e.g. one of the two ♦ cards.
 func reward_decline(option_id: int) -> bool:
+	return _act("reward_decline", [option_id])
+
+
+func _do_reward_decline(option_id: int) -> bool:
 	if state.phase != Phase.REWARD or not can_decline():
 		return false
 	var c = state.find_in(state.reward["options"], option_id)
@@ -758,6 +808,10 @@ func reward_decline(option_id: int) -> bool:
 ## The whole reward as one action: take `take_ids` (when the deck is full, `replace_ids[i]` is swapped out
 ## for `take_ids[i]`), decline the other picks, and for ♣ remove `remove_id` from the deck (an old card).
 func reward_resolve(take_ids: Array, remove_id: int = -1, replace_ids: Array = []) -> bool:
+	return _act("reward_resolve", [take_ids, remove_id, replace_ids])
+
+
+func _do_reward_resolve(take_ids: Array, remove_id: int = -1, replace_ids: Array = []) -> bool:
 	if state.phase != Phase.REWARD:
 		return false
 	var r: Dictionary = state.reward
@@ -816,6 +870,10 @@ func removal_needed(n_takes: int) -> bool:
 
 
 func reward_remove(card_id: int) -> bool:
+	return _act("reward_remove", [card_id])
+
+
+func _do_reward_remove(card_id: int) -> bool:
 	if state.phase != Phase.REWARD_REMOVE:
 		return false
 	var c = state.find_in(state.deck, card_id)
@@ -848,6 +906,10 @@ func _finish_reward() -> void:
 
 
 func attach_joker(card_id: int) -> bool:
+	return _act("attach_joker", [card_id])
+
+
+func _do_attach_joker(card_id: int) -> bool:
 	if state.phase != Phase.JOKER_ATTACH:
 		return false
 	var c = state.find_in(state.deck, card_id)
@@ -863,18 +925,67 @@ func attach_joker(card_id: int) -> bool:
 # ---------------------------------------------------------------- debug
 
 func debug_jump_to_floor(f: int) -> void:
+	_act("debug_jump_to_floor", [f])
+
+
+func _do_debug_jump_to_floor(f: int) -> void:
 	_emit(Ev.DEBUG, {"msg": "jumping to floor %d" % f})
 	state.reward = {}
 	_start_floor(clampi(f, first_floor(), GameState.BOSS_FLOOR))
 
 
 func debug_give_life() -> void:
+	_act("debug_give_life", [])
+
+
+func _do_debug_give_life() -> void:
 	if not state.lost_lives.is_empty():
 		var a = state.lost_lives.pop_back()
 		state.lives.append(a)
 		_emit(Ev.LIFE_RESTORED, {"card": a.label(), "id": a.id, "lives": state.lives.size()})
 	else:
 		_emit(Ev.DEBUG, {"msg": "no lost lives to restore"})
+
+
+# ---------------------------------------------------------------- save & resume
+
+## Runs action `name` (the body is `_do_<name>`) and journals it when it succeeded.
+func _act(name: String, args: Array) -> bool:
+	_depth += 1
+	var r = callv("_do_" + name, args)
+	_depth -= 1
+	var ok := r == null or bool(r)  # debug actions return nothing
+	if ok and _depth == 0:
+		journal.append([name, args.duplicate(true)])
+	return ok
+
+
+## Everything needed to rebuild this run: start arguments, the action journal and a check value.
+func snapshot() -> Dictionary:
+	return {"version": SAVE_VERSION, "seed": _start.get("seed", 0), "balance": _start.get("balance", {}),
+		"options": _start.get("options", {}), "journal": journal.duplicate(true), "check": fingerprint()}
+
+
+## Rebuilds a run from snapshot() by replaying it. False (and the engine is unusable) when the
+## snapshot doesn't replay to the same state, e.g. after a rules change.
+func restore(snap: Dictionary) -> bool:
+	if int(snap.get("version", 0)) != SAVE_VERSION or typeof(snap.get("journal")) != TYPE_ARRAY \
+			or typeof(snap.get("balance")) != TYPE_DICTIONARY or typeof(snap.get("options")) != TYPE_DICTIONARY:
+		return false
+	start_run(int(snap.get("seed", 0)), snap.get("balance", {}), snap.get("options", {}))
+	for step in snap["journal"]:
+		if typeof(step) != TYPE_ARRAY or step.size() != 2 or typeof(step[1]) != TYPE_ARRAY:
+			return false
+		if not has_method("_do_" + str(step[0])) or not _act(str(step[0]), step[1]):
+			return false
+	return fingerprint() == str(snap.get("check", ""))
+
+
+## A short summary of the state, to verify a replayed run.
+func fingerprint() -> String:
+	var s := state
+	return "%d|%d|%d|%d|%d|%s|%s|%s|%s" % [s.phase, s.floor_num, s.round_num, s.next_id, s.lives.size(),
+		str(_ids(s.hand)), str(_ids(s.deck)), str(_ids(s.current)), str(_ids(s.draw_pile))]
 
 
 # ---------------------------------------------------------------- helpers
