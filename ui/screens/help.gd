@@ -48,6 +48,9 @@ static func _panel_with_close(v: VBoxContainer, title: String) -> PanelContainer
 	var t := Style.label(title, 38, Style.GOLD)
 	v.add_child(t)
 	v.move_child(t, 0)
+	var orn := Style.ornament()
+	v.add_child(orn)
+	v.move_child(orn, 1)
 	var close := Style.button("Close", Style.BLACK, 26)
 	close.pressed.connect(p.queue_free)
 	v.add_child(close)
@@ -69,8 +72,8 @@ static func _text(bb: String, size: int = 24) -> RichTextLabel:
 ## The "?" overlay: short rules with the current balance values.
 static func rules_overlay(main) -> Control:
 	var b: Dictionary = main.engine.state.balance if main.engine != null else main.balance()
-	var H := "[color=#f4b942]%s[/color]"
-	var txt := """%s  An enemy card is revealed. [color=#e0383e]Black = attack[/color], [color=#3d8bfd]red = shield[/color]. Its value is its rank.
+	var H := "[color=" + Style.hex(Style.GOLD) + "]%s[/color]"
+	var txt := """%s  An enemy card is revealed. [color=%s]Black = attack[/color], [color=%s]red = shield[/color]. Its value is its rank.
 • Your hand is filled up to %d cards. Cards you don't play stay in your hand.
 • Drag a card onto the enemy to play it. Its effect happens at once (♦ draws a card). Only the right colour counts (green outline): red cards block attacks, black cards break shields. Tap a card to see what it does.
 • Press End turn: the enemy acts and the round is resolved.
@@ -90,7 +93,7 @@ Tip: select a single card to see what it does.
 %s  A shield with no black enemy cards left behind it is a last stand: fail to break it and you lose a life.
 %s  The suit of the last beaten card decides: ♠ pick any beaten card · ♣ reveal 2, take 1, remove 1 · ♥ heal a life · ♦ reveal 2, take both. %s
 %s  Floors go %d to Queen, then the three kings (%d cards in hand). Tap the king at the top to see your mod and the jokers (the red joker arrives after the Jack floor).""" % [
-		H % "EACH ROUND", int(b["hand_size"]),
+		H % "EACH ROUND", Style.hex(Style.RED), Style.hex(Style.BLUE), int(b["hand_size"]),
 		H % "SUITS", str(b["spade_multiplier"]), int(b["club_pair_bonus"]),
 		H % "ATTACK", int(b["graded_threshold"]),
 		H % "OVERPOWER", int(b.get("overpower_multiplier", 2)),
@@ -117,9 +120,9 @@ static func aces_overlay(main) -> Control:
 	var why := "Each ace is one life. Lose them all and the run ends.\n"
 	why += "Sacrifice: lose that life, and the ace counts as a %d this round (red blocks, black attacks)." % int(s.balance["ace_value"])
 	if not s.balance["ace_sac_enabled"] or not e.mod.can_ace_sac():
-		why += "\n[color=#e0383e]Sacrifice is disabled this run.[/color]"
+		why += "\n[color=" + Style.hex(Style.RED) + "]Sacrifice is disabled this run.[/color]"
 	elif s.lives.size() < 2:
-		why += "\n[color=#e0383e]You need at least 2 lives to sacrifice.[/color]"
+		why += "\n[color=" + Style.hex(Style.RED) + "]You need at least 2 lives to sacrifice.[/color]"
 	v.add_child(_text(why, 22))
 	var usable: Array = e.sacrificable_aces()
 	var holder: Array = [null]  # lambdas capture by value; the array lets them reach the panel
@@ -139,7 +142,7 @@ static func aces_overlay(main) -> Control:
 		l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		row.add_child(l)
 		if not lost:
-			var btn := Style.button("Sacrifice", Color("7a2a8c"), 24)
+			var btn := Style.button("Sacrifice", Style.PLUM, 24)
 			btn.custom_minimum_size = Vector2(190, 70)
 			btn.disabled = not usable.has(a)
 			var ace = a
@@ -147,7 +150,7 @@ static func aces_overlay(main) -> Control:
 				if holder[0]:
 					holder[0].queue_free()
 				main.confirm("Sacrifice %s?\nYou lose this life. It counts as %d this round." % [ace.label(), int(s.balance["ace_value"])],
-					[["Sacrifice", func(): main.act(func(): e.sacrifice_ace(ace.id)), Color("7a2a8c")],
+					[["Sacrifice", func(): main.act(func(): e.sacrifice_ace(ace.id)), Style.PLUM],
 					["Cancel", Callable(), Style.BLACK]]))
 			row.add_child(btn)
 		v.add_child(row)
@@ -182,7 +185,7 @@ static func mods_overlay(main) -> Control:
 		for c in s.deck:
 			if c.joker != "":
 				red_state = "Attached under %s." % c.label()
-		kt += "[color=#e0383e]Red joker:[/color] %s %s\n" % [jd.get("red", {}).get("desc", ""), red_state]
+		kt += "[color=" + Style.hex(Style.RED) + "]Red joker:[/color] %s %s\n" % [jd.get("red", {}).get("desc", ""), red_state]
 		kt += "[b]Black joker[/b] (in the boss pile): %s" % jd.get("black", {}).get("desc", "")
 	else:
 		kt += "Jokers are disabled."

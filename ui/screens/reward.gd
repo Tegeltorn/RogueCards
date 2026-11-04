@@ -49,7 +49,7 @@ func enter() -> void:
 	_v.add_theme_constant_override("separation", 16)
 	scroll.add_child(_v)
 	_title = Style.label("", 52, Style.GOLD)
-	_title.add_theme_constant_override("outline_size", 12)
+	_title.add_theme_constant_override("outline_size", 10)
 	_v.add_child(_title)
 	_sub = Style.label("", 26, Style.WHITE)
 	_v.add_child(_sub)

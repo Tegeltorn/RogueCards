@@ -38,13 +38,14 @@ func enter() -> void:
 		fan.add_child(cv)
 		cv.land(0.1 * i)
 
-	_title = Style.label("ROGUECARDS", 76, Style.GOLD)
-	_title.add_theme_constant_override("outline_size", 14)
+	_title = Style.label("RogueCards", 78, Style.GOLD)
+	_title.add_theme_constant_override("outline_size", 10)
 	_title.mouse_filter = Control.MOUSE_FILTER_STOP
 	_title.gui_input.connect(_on_title_input)
 	_title.pivot_offset = Vector2(300, 50)
 	v.add_child(_title)
-	v.add_child(Style.label("A roguelike deckbuilder with a standard deck of cards", 24, Style.MUTED))
+	v.add_child(Style.label("A roguelike deckbuilder with a standard deck of cards", 26, Style.MUTED))
+	v.add_child(Style.ornament())
 
 	var play := Style.button("New run", Style.RED, 38)
 	play.custom_minimum_size.y = 96
@@ -72,17 +73,17 @@ func enter() -> void:
 
 	var toggles := HBoxContainer.new()
 	toggles.alignment = BoxContainer.ALIGNMENT_CENTER
-	for key in ["crt", "sound"]:
+	for key in ["night", "crt", "sound"]:
 		var cb := CheckBox.new()
-		cb.text = "CRT filter" if key == "crt" else "Sound"
-		cb.button_pressed = bool(main.settings.get(key, true))
+		cb.text = {"night": "Night", "crt": "Vignette", "sound": "Sound"}[key]
+		cb.button_pressed = bool(main.settings.get(key, key != "night"))
 		cb.focus_mode = Control.FOCUS_NONE
 		cb.toggled.connect(func(on):
 			main.settings[key] = on
 			main.apply_settings())
 		toggles.add_child(cb)
 	v.add_child(toggles)
-	var hint := Style.label("Hold the title for the debug menu", 18, Color(1, 1, 1, 0.35))
+	var hint := Style.label("Hold the title for the debug menu", 18, Color(Style.MUTED, 0.6))
 	v.add_child(hint)
 
 	var help := Style.button("?", Style.BLUE, 34)
@@ -98,7 +99,7 @@ func enter() -> void:
 func _process(delta: float) -> void:
 	if _title == null:
 		return
-	_title.rotation = sin(Time.get_ticks_msec() / 700.0) * 0.03
+	_title.rotation = sin(Time.get_ticks_msec() / 1400.0) * 0.008
 	if _holding:
 		_hold += delta
 		_title.scale = Vector2.ONE * (1.0 + minf(_hold, 0.8) * 0.15)

@@ -1,14 +1,18 @@
 shader_type canvas_item;
-// Subtle scanlines + vignette overlay. Drawn on top of everything, ignores input.
+// "Vignette" setting: a warm, soft darkening at the edges plus a very fine grain, like an old page
+// under lamplight. Drawn on top of everything, ignores input.
 
-uniform float line_strength = 0.12;
-uniform float vignette = 0.35;
+uniform vec4 tint : source_color = vec4(0.25, 0.14, 0.06, 1.0);
+uniform float vignette = 0.28;
+uniform float grain = 0.025;
+
+float hash(vec2 p) {
+	return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
+}
 
 void fragment() {
-	vec2 res = 1.0 / SCREEN_PIXEL_SIZE;
-	float line = 0.5 + 0.5 * sin(FRAGCOORD.y * 3.14159 * 0.5);
 	vec2 uv = SCREEN_UV - 0.5;
-	float v = smoothstep(0.8, 0.2, length(uv * vec2(1.0, 0.8)));
-	float dark = line * line_strength + (1.0 - v) * vignette;
-	COLOR = vec4(0.0, 0.0, 0.0, clamp(dark, 0.0, 0.8));
+	float v = smoothstep(0.35, 0.95, length(uv * vec2(1.0, 0.8)));
+	float n = hash(floor(FRAGCOORD.xy / 2.0));
+	COLOR = vec4(tint.rgb, clamp(v * vignette + n * grain, 0.0, 0.6));
 }

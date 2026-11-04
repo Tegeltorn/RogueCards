@@ -27,15 +27,18 @@ class Icon:
 			var blade := PackedVector2Array([c + Vector2(-0.07, 0.15) * s, c + Vector2(-0.07, -0.38) * s,
 				c + Vector2(0, -0.48) * s, c + Vector2(0.07, -0.38) * s, c + Vector2(0.07, 0.15) * s])
 			draw_colored_polygon(blade, col)
-			draw_polyline(blade + PackedVector2Array([blade[0]]), Style.INK, 3)
-			draw_rect(Rect2(c + Vector2(-0.24, 0.15) * s, Vector2(0.48, 0.08) * s), Style.GOLD)
-			draw_rect(Rect2(c + Vector2(-0.05, 0.23) * s, Vector2(0.1, 0.2) * s), Color("8b5a2b"))
+			draw_polyline(blade + PackedVector2Array([blade[0]]), Style.INK, 2, true)
+			draw_line(c + Vector2(0, 0.12) * s, c + Vector2(0, -0.4) * s, Color(Style.INK, 0.35), 1.5, true)
+			draw_rect(Rect2(c + Vector2(-0.24, 0.15) * s, Vector2(0.48, 0.07) * s), Style.GOLD)
+			draw_rect(Rect2(c + Vector2(-0.045, 0.22) * s, Vector2(0.09, 0.18) * s), Style.INK.lerp(Style.GOLD, 0.35))
+			draw_circle(c + Vector2(0, 0.43) * s, 0.05 * s, Style.GOLD)
 		else:
 			var sh := PackedVector2Array([c + Vector2(-0.36, -0.4) * s, c + Vector2(0.36, -0.4) * s,
 				c + Vector2(0.34, 0.05) * s, c + Vector2(0, 0.45) * s, c + Vector2(-0.34, 0.05) * s])
 			draw_colored_polygon(sh, col)
-			draw_polyline(sh + PackedVector2Array([sh[0]]), Style.INK, 4)
-			draw_line(c + Vector2(0, -0.35) * s, c + Vector2(0, 0.38) * s, Color(1, 1, 1, 0.5), 3)
+			draw_polyline(sh + PackedVector2Array([sh[0]]), Style.INK, 2, true)
+			draw_line(c + Vector2(0, -0.35) * s, c + Vector2(0, 0.38) * s, Color(Style.GOLD, 0.8), 2, true)
+			draw_line(c + Vector2(-0.3, -0.12) * s, c + Vector2(0.3, -0.12) * s, Color(Style.GOLD, 0.8), 2, true)
 
 
 class FloorStrip:
@@ -50,11 +53,13 @@ class FloorStrip:
 		for i in n:
 			var f := first + i
 			var r := Rect2(i * (w + 6), 0, w, size.y)
-			var bg := Style.PAPER if f == current else (Color(1, 1, 1, 0.12) if f < current else Color(0, 0, 0, 0.35))
-			draw_style_box(Style.box(bg, Style.INK if f == current else Color(1, 1, 1, 0.2), 3, 6), r)
+			# current floor: a gilt tile; cleared floors fade back; floors ahead are quiet parchment tiles
+			var bg := Style.PAPER if f == current else (Color(Style.INK, 0.05) if f < current else Color(Style.PAPER, 0.55 if not Style.night else 0.1))
+			var bc := Style.GOLD if f == current else Color(Style.INK, 0.12 if f < current else 0.3)
+			draw_style_box(Style.box(bg, bc, 3 if f == current else 1, 8), r)
 			var txt := Style.floor_text(f)
-			var tc := Style.INK if f == current else (Color(1, 1, 1, 0.35) if f < current else Style.WHITE)
-			draw_string(font, r.position + Vector2(0, size.y * 0.72), txt, HORIZONTAL_ALIGNMENT_CENTER, w, 24, tc)
+			var tc := Style.INK if f == current else (Color(Style.MUTED, 0.5) if f < current else Style.WHITE)
+			draw_string(font, r.position + Vector2(0, size.y * 0.7), txt, HORIZONTAL_ALIGNMENT_CENTER, w, 26 if f == current else 23, tc)
 
 
 var main
@@ -119,7 +124,7 @@ func enter() -> void:
 
 func _build() -> void:
 	_floor_strip = FloorStrip.new()
-	_floor_strip.font = Style.font()
+	_floor_strip.font = Style.bold()
 	_floor_strip.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_floor_strip)
 
@@ -168,12 +173,13 @@ func _build() -> void:
 	_total_label.scroll_active = false
 	_total_label.autowrap_mode = TextServer.AUTOWRAP_OFF
 	_total_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_total_label.add_theme_constant_override("outline_size", 12)
-	_total_label.add_theme_color_override("font_outline_color", Style.INK)
+	_total_label.add_theme_constant_override("outline_size", 10)
+	_total_label.add_theme_color_override("font_outline_color", Style.BG_A)
+	_total_label.add_theme_font_override("normal_font", Style.display())
 	_total_label.add_theme_font_size_override("normal_font_size", 60)
 	add_child(_total_label)
 	_showdown = PanelContainer.new()
-	_showdown.add_theme_stylebox_override("panel", Style.box(Color(0.55, 0.05, 0.12, 0.95), Style.GOLD, 4, 10))
+	_showdown.add_theme_stylebox_override("panel", Style.box(Color(Style.RED.darkened(0.15), 0.96), Style.GOLD, 2, 12))
 	_showdown.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_showdown_label = RichTextLabel.new()
 	_showdown_label.bbcode_enabled = true
@@ -186,7 +192,7 @@ func _build() -> void:
 	_showdown.z_index = 20
 	add_child(_showdown)
 	_finish_tip = PanelContainer.new()
-	_finish_tip.add_theme_stylebox_override("panel", Style.box(Color(0.06, 0.04, 0.1, 0.9), Color(Style.GOLD, 0.7), 3, 10))
+	_finish_tip.add_theme_stylebox_override("panel", Style.box(Color(Style.PANEL, 0.94), Color(Style.GOLD, 0.6), 1, 10))
 	_finish_tip.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_finish_label = RichTextLabel.new()
 	_finish_label.bbcode_enabled = true
@@ -220,13 +226,13 @@ func _build() -> void:
 	_disc_btn.custom_minimum_size = Vector2(110, 80)
 	_disc_btn.pressed.connect(func(): _show_pile("Discard pile", _e.state.discard))
 	add_child(_disc_btn)
-	_main_btn = Style.button("End turn", Style.RED, 32)
+	_main_btn = Style.button("End turn", Style.GREEN, 32)
 	_main_btn.custom_minimum_size = Vector2(200, 92)
 	_main_btn.pressed.connect(_on_main)
 	add_child(_main_btn)
 
 	_tooltip = PanelContainer.new()
-	_tooltip.add_theme_stylebox_override("panel", Style.box(Color(0.06, 0.04, 0.1, 0.96), Style.GOLD, 3, 12))
+	_tooltip.add_theme_stylebox_override("panel", Style.box(Color(Style.PANEL, 0.97), Color(Style.GOLD, 0.7), 2, 12))
 	_tooltip.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_tooltip_label = Style.label("", 22, Style.WHITE, HORIZONTAL_ALIGNMENT_LEFT)
 	_tooltip_label.custom_minimum_size = Vector2(380, 0)
@@ -285,15 +291,17 @@ func _layout() -> void:
 	var by := H - 106
 	# Lives sit in the bottom bar between the draw pile and the main button.
 	_lives_box.position = Vector2(132, by + 2)
-	_lives_caption.position = Vector2(132, by - 22)
-	_lives_caption.size = Vector2(180, 22)
+	# Caption sits clear of the sacrifice highlight drawn around the aces (it grows ~9 px outside them).
+	_lives_caption.position = Vector2(134, by - 33)
+	_lives_caption.size = Vector2(180, 24)
+	_lives_caption.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
 	_draw_btn.position = Vector2(14, by)
 	_disc_btn.position = Vector2(W - 124, by)
 	# Bottom bar: Draw | lives | Play | End turn | Discard
 	var lives_w := 132.0 + maxi(3, _e.state.max_lives if _e else 3) * (MINI.x + 6)
 	_main_btn.position = Vector2(lives_w + 2, by - 6)
 	_main_btn.size = Vector2(W - 124 - 8 - lives_w - 2, 92)
-	var hy := by - HAND_CARD.y - 40
+	var hy := by - HAND_CARD.y - 58
 	_hand_layer.position = Vector2(0, hy)
 	_hand_layer.size = Vector2(W, HAND_CARD.y)
 	_hint_label.position = Vector2(0, hy - 46)
@@ -395,11 +403,12 @@ func _sync_intents(cards: Array) -> void:
 		var attack: bool = card.base_black()
 		var ic := Icon.new()
 		ic.kind = "attack" if attack else "shield"
-		ic.col = Color("d9dde8") if attack else Style.BLUE
+		ic.col = Style.STEEL if attack else Style.BLUE
 		ic.size = Vector2(70, 70)
 		var val: int = _e.enemy_value(card)
 		var lab := Style.label(str(val), 48, Style.RED if attack else Style.BLUE)
-		lab.add_theme_constant_override("outline_size", 10)
+		lab.add_theme_font_override("font", Style.bold())
+		lab.add_theme_constant_override("outline_size", 8)
 		lab.size = Vector2(90, 60)
 		if n == 1:
 			ic.position = Vector2(W / 2 + ENEMY_CARD.x / 2 + 18, 60)
@@ -558,7 +567,7 @@ func _update_life_glow() -> void:
 	for child in _lives_box.get_children():
 		var cv := child as CardView
 		if cv and cv.face_up:
-			cv.highlight = Color("b05cff") if short and usable.has(cv.card_id) else Color(0, 0, 0, 0)
+			cv.highlight = Style.PLUM if short and usable.has(cv.card_id) else Color(0, 0, 0, 0)
 
 
 ## Small explanation above the card when exactly one card is selected.
@@ -603,7 +612,7 @@ func _update_total() -> void:
 	if int(t["block_need"]) > 0:
 		var part := "BLOCK %d / %d" % [t["block"], t["block_need"]]
 		if int(t["carry"]) > 0:
-			part += " [font_size=26][color=#3d8bfd](+%d stored from [color=#e0383e]♥[/color])[/color][/font_size]" % int(t["carry"])
+			part += " [font_size=26][color=%s](+%d stored from [color=%s]♥[/color])[/color][/font_size]" % [Style.hex(Style.BLUE), int(t["carry"]), Style.hex(Style.RED)]
 		parts.append(part)
 		ok = ok and int(t["block"]) >= int(t["block_need"])
 		exact = int(t["block"]) == int(t["block_need"])
@@ -613,7 +622,7 @@ func _update_total() -> void:
 		ok = ok and int(t["attack"]) >= int(t["attack_need"])
 		exact = exact or int(t["attack"]) == int(t["attack_need"])
 		total += int(t["attack"])
-	var col := "#2ec27e" if ok else "#fffaf0"
+	var col := Style.hex(Style.GREEN) if ok else Style.hex(Style.WHITE)
 	var fs := 40 if parts.size() > 1 else 60
 	_total_label.text = "[center][font_size=%d][color=%s]%s[/color][/font_size][/center]" % [fs, col, "  ".join(parts)]
 	if ok:
@@ -644,8 +653,8 @@ func _update_total() -> void:
 		_need_label.text += "  ·  ♥ stores %d shield" % int(t["hearts"])
 	if total != _last_total:
 		_last_total = total
-		_total_label.scale = Vector2(1.25, 1.25)
-		create_tween().tween_property(_total_label, "scale", Vector2.ONE, 0.25).set_trans(Tween.TRANS_BACK)
+		_total_label.scale = Vector2(1.08, 1.08)
+		create_tween().tween_property(_total_label, "scale", Vector2.ONE, 0.25).set_trans(Tween.TRANS_SINE)
 		if ok:
 			main.sfx.play("select", 1.4)
 
@@ -672,7 +681,7 @@ func _update_finish_tip() -> void:
 	if not show:
 		return
 	var cur: String = s.current[0].suit
-	var lines: Array = ["[color=#f4b942]FINISH ON[/color]"]
+	var lines: Array = ["[color=%s]FINISH ON[/color]" % Style.hex(Style.GOLD)]
 	for suit in ["S", "C", "H", "D"]:
 		var r: Dictionary = _e.reward_rules(suit)
 		var txt := ""
@@ -683,10 +692,10 @@ func _update_finish_tip() -> void:
 				var h := int(r["heal"])
 				txt = "+%d %s" % [h, "life" if h == 1 else "lives"]
 			"D": txt = "take %d of %d" % [int(r["picks"]), int(r["reveal"])] if int(r["picks"]) < int(r["reveal"]) else "take %d" % int(r["picks"])
-		var col := "#e0383e" if suit == "H" or suit == "D" else "#fffaf0"
+		var col := Style.hex(Style.RED) if suit == "H" or suit == "D" else Style.hex(Style.WHITE)
 		var line := "[color=%s]%s[/color] %s" % [col, Style.SUIT_SYM[suit], txt]
 		if suit == cur:
-			line = "[color=#2ec27e]> [/color]" + line
+			line = "[color=%s]> [/color]" % Style.hex(Style.GREEN) + line
 		lines.append(line)
 	_finish_label.text = "\n".join(lines)
 
@@ -699,12 +708,12 @@ func _update_showdown() -> void:
 		_showdown.visible = false
 		return
 	var flavour: String = SHOWDOWN_FLAVOUR[int(s.current[0].id) % SHOWDOWN_FLAVOUR.size()]
-	_showdown_label.text = "[center][font_size=30][color=#f4b942]LAST STAND![/color][/font_size]\n%s\n[color=#ffd0d0]Fail to break this shield and you lose a life.[/color][/center]" % flavour
+	_showdown_label.text = "[center][font_size=30][color=%s]LAST STAND![/color][/font_size]\n[color=%s]%s\nFail to break this shield and you lose a life.[/color][/center]" % [Style.hex(Style.GOLD.lightened(0.35)), Style.hex(Style.ON_DARK), flavour]
 	if not _showdown.visible:
 		_showdown.visible = true
 		_showdown.pivot_offset = Vector2(230, 50)
-		_showdown.scale = Vector2(0.6, 0.6)
-		create_tween().tween_property(_showdown, "scale", Vector2.ONE, 0.3).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		_showdown.scale = Vector2(0.94, 0.94)
+		create_tween().tween_property(_showdown, "scale", Vector2.ONE, 0.3).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 
 
 # ---------------------------------------------------------------- input
@@ -801,7 +810,7 @@ func _tap_enemy(cv: CardView) -> void:
 	tw.tween_property(cv, "rotation", 0.12, 0.06)
 	tw.parallel().tween_property(cv, "scale", Vector2(1.12, 1.12), 0.06)
 	tw.tween_callback(func():
-		main.burst(center, Style.WHITE, 12)
+		main.burst(center, Style.GOLD, 12)
 		main.shake(5.0)
 		for id in _enemy_views:
 			_enemy_views[id].pop(0.08))
@@ -838,7 +847,7 @@ func _open_menu() -> void:
 	var choices: Array = [["How to play", func(): main.open_overlay(Help.rules_overlay(main)), Style.BLUE],
 		["Event log", func(): main.open_log(), Style.BLUE]]
 	if main.debug_unlocked:
-		choices.append(["Debug menu", func(): main.open_debug(), Color("7a2a8c")])
+		choices.append(["Debug menu", func(): main.open_debug(), Style.PLUM])
 	choices.append(["Quit run", func(): main.quit_to_menu(), Style.RED])
 	choices.append(["Back", Callable(), Style.BLACK])
 	main.confirm("Seed %d" % _e.state.seed_value, choices)
@@ -884,7 +893,7 @@ func play_event(ev: Dictionary) -> float:
 			return 0.7
 		Ev.JOKER_TRIGGERED:
 			main.toast("JOKER!", Style.RED, 380)
-			main.flash(Color(0.6, 0, 0.2, 0.4))
+			main.flash(Color(Style.RED, 0.4))
 			_hint_label.text = ev["desc"]
 			main.sfx.play("hit", 0.7)
 			return 0.9
@@ -952,7 +961,7 @@ func play_event(ev: Dictionary) -> float:
 				add_child(cv)
 				cv.global_position = _lives_box.get_global_rect().get_center() - HAND_CARD / 2
 				_tap_enemy(cv)
-			main.flash(Color(0.5, 0.1, 0.6, 0.4))
+			main.flash(Color(Style.PLUM, 0.4))
 			return 0.4
 		Ev.LIFE_LOST:
 			for child in _lives_box.get_children():
@@ -977,7 +986,7 @@ func play_event(ev: Dictionary) -> float:
 			return 0.55
 		Ev.DAMAGE_TAKEN:
 			main.shake(28.0 if ev["lives"] >= 2 else 16.0)
-			main.flash(Color(0.9, 0, 0, 0.45), 0.4)
+			main.flash(Color(Style.RED, 0.45), 0.4)
 			main.toast("-%d %s" % [ev["lives"], "LIFE" if ev["lives"] == 1 else "LIVES"], Style.RED, 600)
 			main.sfx.play("hit")
 			return 0.6

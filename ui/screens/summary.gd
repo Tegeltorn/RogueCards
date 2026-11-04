@@ -20,7 +20,7 @@ func enter() -> void:
 	v.add_theme_constant_override("separation", 18)
 	m.add_child(v)
 	var t := Style.label("VICTORY!" if won else "DEFEAT", 88, Style.GOLD if won else Style.RED)
-	t.add_theme_constant_override("outline_size", 16)
+	t.add_theme_constant_override("outline_size", 10)
 	v.add_child(t)
 	var rows := [
 		["Floor", "King (won)" if won else Style.floor_text(s.floor_num)],

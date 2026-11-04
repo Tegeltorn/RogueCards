@@ -2,13 +2,13 @@
 
 importer="font_data_dynamic"
 type="FontFile"
-uid="uid://c6t81b5khf1do"
-path="res://.godot/imported/Jersey10.ttf-0178de518bf7fb57c4e123d87dda228f.fontdata"
+uid="uid://bp7nu3e7xmy62"
+path="res://.godot/imported/EBGaramond.ttf-79e8f860ffb742059dfbdb6c6f1064f7.fontdata"
 
 [deps]
 
-source_file="res://assets/fonts/Jersey10.ttf"
-dest_files=["res://.godot/imported/Jersey10.ttf-0178de518bf7fb57c4e123d87dda228f.fontdata"]
+source_file="res://assets/fonts/EBGaramond.ttf"
+dest_files=["res://.godot/imported/EBGaramond.ttf-79e8f860ffb742059dfbdb6c6f1064f7.fontdata"]
 
 [params]
 
