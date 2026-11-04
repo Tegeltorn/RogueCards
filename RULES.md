@@ -59,9 +59,9 @@ Beat the whole boss pile to win.
 ## Mods (mod ace)
 | Mod ace | Mod |
 |---|---|
-| ♥ Hardened | The ♥ reward heals 2 lives, but ace sacrifice is disabled. |
-| ♦ Rich | Keep two of the offered threes instead of one. The ♦ reward gives only 1 card. |
-| ♠ Bloodthirst | Your attack gets +1, but every enemy attack also gets +1. |
+| ♥ Hardened | Your mod ace is a 4th life, but ace sacrifice is disabled. |
+| ♦ Rich | Every reward reveals 1 more card. |
+| ♠ Bloodthirst | Your attack gets +4, but every enemy attack also gets +1. |
 | ♣ Foresight | Keep the top card of the enemy pile face up: you always see the next enemy card. |
 
 ## Current balance values
@@ -81,7 +81,7 @@ A test keeps these values in sync with `config/balance.json`.
 | `deck_min` | 4 | Min cards in your deck |
 | `lives` | 3 | Number of life aces |
 | `short_floors` | [4,5] | Floors with only 3 enemies |
-| `graded_threshold` | 5 | Miss that costs 2 lives |
-| `club_pair_bonus` | 2 | Clubs bonus |
+| `graded_threshold` | 4 | Miss that costs 2 lives |
+| `club_pair_bonus` | 1 | Clubs bonus |
 | `overpower_multiplier` | 2 | Black value needed to overpower an attack (× its value) |
 | `overpower_draw` | 1 | Cards drawn on overpower |

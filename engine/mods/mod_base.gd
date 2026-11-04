@@ -17,6 +17,11 @@ func setup(p_suit: String, data: Dictionary) -> void:
 	params = data.get("params", {})
 
 
+## True if the mod ace itself counts as an extra life.
+func mod_ace_is_life() -> bool:
+	return bool(params.get("mod_ace_is_life", false))
+
+
 ## How many of the offered start cards the player keeps.
 func modify_start_picks(n: int) -> int:
 	return n

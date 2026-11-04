@@ -11,6 +11,8 @@ extends SceneTree
 ##   --parity            spec values + settings that match sim/reference/balance_sim_fixed.py, with its numbers
 ##   --all               default report + parity report
 ##   --out path          also write the report (markdown) to a file
+##   --force-mod S       every run uses the mod ace of suit S (H, D, S, C)
+##   --mods path         load mods from another JSON file (for tuning mod parameters)
 
 const SimLib := preload("res://sim/sim_lib.gd")
 const Balance := preload("res://engine/balance.gd")
@@ -21,6 +23,11 @@ func _init() -> void:
 	var runs := int(args.get("runs", "20000"))
 	var seed0 := int(args.get("seed", "1"))
 	var base := {}
+	var run_opts := {}
+	if args.has("force-mod"):
+		run_opts["force_mod"] = args["force-mod"]
+	if args.has("mods"):
+		Balance.mods_path = args["mods"]
 	if args.has("preset"):
 		base = Balance.load_json(args["preset"])
 	var reports: Array = []
@@ -36,7 +43,7 @@ func _init() -> void:
 			ov["heart_carry_mode"] = args["heart-carry"]
 		SimLib.apply_sets(ov, args["set"])
 		var bal := Balance.make(ov)
-		var st := SimLib.run_batch(bal, runs, seed0)
+		var st := SimLib.run_batch(bal, runs, seed0, run_opts)
 		reports.append(SimLib.format_report("Current balance" + (" (" + str(ov) + ")" if not ov.is_empty() else ""), st))
 
 	if args.has("parity") or args.has("all"):

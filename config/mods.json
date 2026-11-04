@@ -2,26 +2,26 @@
   "H": {
     "id": "hardened",
     "name": "Hardened",
-    "desc": "The ♥ reward heals 2 lives, but ace sacrifice is disabled.",
+    "desc": "Your mod ace is a 4th life, but ace sacrifice is disabled.",
     "params": {
-      "heart_heal": 2
+      "heart_heal": 1,
+      "mod_ace_is_life": true
     }
   },
   "D": {
     "id": "rich",
     "name": "Rich",
-    "desc": "Keep two of the three offered threes, but the ♦ reward gives only 1 card.",
+    "desc": "Every reward reveals 1 more card.",
     "params": {
-      "start_picks": 2,
-      "diamond_picks": 1
+      "reveal_bonus": 1
     }
   },
   "S": {
     "id": "bloodthirst",
     "name": "Bloodthirst",
-    "desc": "Your attacks get +1, but enemy attacks also get +1.",
+    "desc": "Your attacks get +4, but enemy attacks also get +1.",
     "params": {
-      "player_attack_bonus": 1,
+      "player_attack_bonus": 4,
       "enemy_attack_bonus": 1
     }
   },

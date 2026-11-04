@@ -85,7 +85,7 @@ func test_bloodthirst() -> void:
 	var e := scenario(["4S"], ["5S"], {"mods_enabled": true}, {"force_mod": "S"})
 	eq(e.block_need(), 6, "enemy attack +1")
 	set_round(e, ["4S"], ["5H"])
-	eq(int(e.preview(ids(e.state.hand))["attack"]), 7, "6 + 1")
+	eq(int(e.preview(ids(e.state.hand))["attack"]), 10, "6 + 4")
 
 
 func test_foresight() -> void:
@@ -97,6 +97,7 @@ func test_foresight() -> void:
 func test_hardened() -> void:
 	var e := scenario([], ["12S"], {"mods_enabled": true, "ace_sac_own_color": false}, {"force_mod": "H"})
 	eq(e.sacrificable_aces().size(), 0, "no ace sacrifice")
+	eq(e.state.lives.size(), 4, "mod ace is a 4th life")
 
 
 func test_start_pick() -> void:
@@ -114,15 +115,12 @@ func test_start_pick() -> void:
 	eq(e.state.floor_num, 4, "the run starts on the fours")
 
 
-func test_rich_keeps_two() -> void:
+func test_rich_reveals_more() -> void:
 	var e := GameEngine.new()
 	e.start_run(5, Balance.make({}), {"force_mod": "D"})
-	eq(e.state.setup_picks, 2, "Rich keeps two")
-	e.setup_pick(e.state.setup_options[0].id)
-	eq(e.state.phase, Phase.SETUP_PICK, "still picking")
-	e.setup_pick(e.state.setup_options[0].id)
-	eq(e.state.phase, Phase.REVEAL, "done")
-	eq(e.state.deck.size(), 6, "four twos + two threes")
+	eq(e.state.setup_picks, 1, "Rich keeps one three like everyone")
+	eq(int(e.reward_rules("C")["reveal"]), 3, "♣ reward reveals 3")
+	eq(int(e.reward_rules("D")["picks"]), 2, "♦ reward still takes 2")
 
 
 func test_spec_preset_starts_on_three() -> void:

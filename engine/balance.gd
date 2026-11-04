@@ -11,6 +11,7 @@ const BOOL_KEYS := ["keep_hand", "reward_optional", "free_discard", "ace_sac_ena
 	"mods_enabled", "jokers_enabled"]
 
 static var _cache: Dictionary = {}
+static var mods_path := MODS_PATH  # the simulator can point this at an alternate mods file
 
 
 static func load_json(path: String) -> Dictionary:
@@ -55,7 +56,7 @@ static func normalise(b: Dictionary) -> Dictionary:
 
 
 static func mods() -> Dictionary:
-	return load_json(MODS_PATH)
+	return load_json(mods_path)
 
 
 static func jokers() -> Dictionary:

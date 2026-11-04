@@ -1,11 +1,12 @@
 extends "res://engine/mods/mod_base.gd"
-## ♦ Rich: keep two of the offered threes, but the diamond reward gives only 1 card.
+## ♦ Rich: rewards reveal more cards (and other tunable twists, see params in config/mods.json).
 
 
-func modify_start_picks(_n: int) -> int:
-	return int(params.get("start_picks", 2))
+func modify_start_picks(n: int) -> int:
+	return int(params.get("start_picks", n))
 
 
 func modify_reward(reward: Dictionary) -> void:
-	if reward.get("suit", "") == "D":
-		reward["picks"] = int(params.get("diamond_picks", 1))
+	reward["reveal"] = int(reward["reveal"]) + int(params.get("reveal_bonus", 0))
+	if reward.get("suit", "") == "D" and params.has("diamond_picks"):
+		reward["picks"] = int(params["diamond_picks"])

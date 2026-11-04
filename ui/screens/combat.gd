@@ -290,8 +290,9 @@ func _layout() -> void:
 	_draw_btn.position = Vector2(14, by)
 	_disc_btn.position = Vector2(W - 124, by)
 	# Bottom bar: Draw | lives | Play | End turn | Discard
-	_main_btn.position = Vector2(326, by - 6)
-	_main_btn.size = Vector2(W - 124 - 8 - 326, 92)
+	var lives_w := 132.0 + maxi(3, _e.state.max_lives if _e else 3) * (MINI.x + 6)
+	_main_btn.position = Vector2(lives_w + 2, by - 6)
+	_main_btn.size = Vector2(W - 124 - 8 - lives_w - 2, 92)
 	var hy := by - HAND_CARD.y - 40
 	_hand_layer.position = Vector2(0, hy)
 	_hand_layer.size = Vector2(W, HAND_CARD.y)

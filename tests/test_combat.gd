@@ -38,14 +38,14 @@ func test_hearts_on_shield_store_full_value() -> void:
 
 
 func test_miss_small_costs_one_life() -> void:
-	var e := scenario(["4H"], ["8S"], {}, {"pile": ["9S"]})
+	var e := scenario(["4H"], ["8S"], {"graded_threshold": 5}, {"pile": ["9S"]})
 	e.play_cards([e.state.hand[0].id])
 	e.resolve()  # miss 4
 	eq(e.state.lives.size(), 2, "lives")
 
 
 func test_miss_graded_costs_two_lives() -> void:
-	var e := scenario(["3H"], ["8S"], {}, {"pile": ["9S"]})
+	var e := scenario(["3H"], ["8S"], {"graded_threshold": 5}, {"pile": ["9S"]})
 	e.play_cards([e.state.hand[0].id])
 	e.resolve()  # miss 5
 	eq(e.state.lives.size(), 1, "lives")
@@ -67,7 +67,7 @@ func test_spade_multiplier_rounds_down() -> void:
 
 
 func test_club_pair_bonus() -> void:
-	var e := scenario(["3C", "4C"], ["9H"], {}, {"pile": ["9S"]})
+	var e := scenario(["3C", "4C"], ["9H"], {"club_pair_bonus": 2}, {"pile": ["9S"]})
 	eq(int(e.preview(ids(e.state.hand))["attack"]), 9, "3♣+4♣+2")
 	var e2 := scenario(["3C", "4S"], ["9H"])
 	eq(int(e2.preview(ids(e2.state.hand))["attack"]), 9, "3♣+6 (4♠) no bonus")

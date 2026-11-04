@@ -72,6 +72,9 @@ func start_run(p_seed: int, balance: Dictionary = {}, options: Dictionary = {}) 
 		mod = ModBase.new()
 	if b["mods_enabled"]:
 		mod.setup(state.mod_suit, mdata)
+		if mod.mod_ace_is_life():
+			state.lives.append(state.mod_ace)
+			state.max_lives = state.lives.size()
 
 	# Starting deck: the four twos.
 	for s in Card.SUITS:
