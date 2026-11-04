@@ -44,6 +44,10 @@ jobs:
     name: Export web + Android
     needs: test
     runs-on: ubuntu-latest
+    # All branches publish to the same gh-pages branch: deploy one run at a time.
+    concurrency:
+      group: gh-pages-deploy
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@v4
       - name: Branch name
@@ -78,6 +82,19 @@ jobs:
           ls -la build/web
           test -f build/web/index.wasm
       - name: Deploy web (latest)
+        id: deploy_latest
+        continue-on-error: true
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: build/web
+          keep_files: true
+          commit_message: "web: ${{ github.ref_name }} ${{ github.sha }}"
+      - name: Wait before retrying deploy web (latest)
+        if: steps.deploy_latest.outcome == 'failure'
+        run: sleep 20
+      - name: Deploy web (latest) (retry)
+        if: steps.deploy_latest.outcome == 'failure'
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
@@ -85,6 +102,20 @@ jobs:
           keep_files: true
           commit_message: "web: ${{ github.ref_name }} ${{ github.sha }}"
       - name: Deploy web (branch)
+        id: deploy_branch
+        continue-on-error: true
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: build/web
+          destination_dir: branch/${{ env.BRANCH_SLUG }}
+          keep_files: true
+          commit_message: "web: ${{ github.ref_name }} ${{ github.sha }} (branch)"
+      - name: Wait before retrying deploy web (branch)
+        if: steps.deploy_branch.outcome == 'failure'
+        run: sleep 20
+      - name: Deploy web (branch) (retry)
+        if: steps.deploy_branch.outcome == 'failure'
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
