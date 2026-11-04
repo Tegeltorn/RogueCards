@@ -92,7 +92,13 @@ jobs:
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git clone --depth 1 --branch gh-pages "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" pages
+          URL="https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git"
+          if ! git clone --depth 1 --branch gh-pages "$URL" pages; then
+            # gh-pages is gone (e.g. deleted with old branches): start it again as an empty branch.
+            rm -rf pages && mkdir pages && cd pages
+            git init -q -b gh-pages && git remote add origin "$URL"
+            cd ..
+          fi
           rsync -a build/web/ pages/                                   # root = latest push from any branch
           mkdir -p "pages/branch/${BRANCH_SLUG}"
           rsync -a --delete build/web/ "pages/branch/${BRANCH_SLUG}/"  # per-branch copy
