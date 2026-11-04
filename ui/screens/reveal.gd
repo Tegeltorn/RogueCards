@@ -4,6 +4,7 @@ extends Control
 
 const Style := preload("res://ui/style.gd")
 const CardView := preload("res://ui/card_view.gd")
+const Help := preload("res://ui/screens/help.gd")
 const GameState := preload("res://engine/game_state.gd")
 const Phase := GameState.Phase
 
@@ -13,6 +14,7 @@ var _pick_row: HBoxContainer
 var _start: Button
 var _pick_ids: Array = []  # start pick: threes tapped so far (confirmed with the main button)
 var _deck_row: HBoxContainer
+var _tip: PanelContainer
 var _deck_label: Label
 var _pick_label: Label
 
@@ -22,11 +24,11 @@ func enter() -> void:
 	var m := Style.full(MarginContainer.new())
 	for side in ["left", "right"]:
 		m.add_theme_constant_override("margin_" + side, 28)
-	m.add_theme_constant_override("margin_top", 50)
-	m.add_theme_constant_override("margin_bottom", 40)
+	m.add_theme_constant_override("margin_top", 24)
+	m.add_theme_constant_override("margin_bottom", 24)
 	add_child(m)
 	_v = VBoxContainer.new()
-	_v.add_theme_constant_override("separation", 14)
+	_v.add_theme_constant_override("separation", 8)
 	m.add_child(_v)
 	_v.add_child(Style.label("Seed %d" % s.seed_value, 22, Style.MUTED))
 
@@ -53,6 +55,8 @@ func enter() -> void:
 	pad.add_theme_constant_override("margin_top", 44)
 	pad.add_child(_pick_row)
 	_v.add_child(pad)
+	_tip = Help.tip_box()
+	_v.add_child(_tip)
 	_deck_label = Style.label("Your deck", 22, Style.MUTED)
 	_v.add_child(_deck_label)
 	_deck_row = HBoxContainer.new()
@@ -114,6 +118,8 @@ func _on_pick(id: int) -> void:
 
 func _update_pick() -> void:
 	var s = main.engine.state
+	var shown = s.find_in(s.setup_options, _pick_ids[-1]) if not _pick_ids.is_empty() else null
+	Help.show_tip(_tip, s.balance, shown if s.phase == Phase.SETUP_PICK else null)
 	if s.phase != Phase.SETUP_PICK:
 		_start.text = "To battle!"
 		_start.disabled = false
@@ -173,7 +179,7 @@ func _reveal_block(card, title: String, name: String, desc: String, delay: float
 	h.add_theme_constant_override("separation", 20)
 	var cv := CardView.new()
 	cv.set_interactive(false)
-	cv.setup(card, Vector2(170, 238))
+	cv.setup(card, Vector2(140, 196))
 	cv.face_up = false
 	h.add_child(cv)
 	var tv := VBoxContainer.new()
@@ -182,7 +188,7 @@ func _reveal_block(card, title: String, name: String, desc: String, delay: float
 	tv.add_child(Style.label(title, 24, Style.MUTED, HORIZONTAL_ALIGNMENT_LEFT))
 	var nl := Style.label(name, 40, Style.GOLD, HORIZONTAL_ALIGNMENT_LEFT)
 	tv.add_child(nl)
-	var dl := Style.label(desc, 22, Style.WHITE, HORIZONTAL_ALIGNMENT_LEFT)
+	var dl := Style.label(desc, 20, Style.WHITE, HORIZONTAL_ALIGNMENT_LEFT)
 	tv.add_child(dl)
 	h.add_child(tv)
 	tv.modulate.a = 0.0

@@ -44,6 +44,10 @@ jobs:
     name: Export web + Android
     needs: test
     runs-on: ubuntu-latest
+    # All branches publish to the same gh-pages branch: deploy one run at a time.
+    concurrency:
+      group: gh-pages-deploy
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@v4
       - name: Branch name
@@ -77,21 +81,27 @@ jobs:
           godot --headless --path . --export-release "Web" build/web/index.html
           ls -la build/web
           test -f build/web/index.wasm
-      - name: Deploy web (latest)
-        uses: peaceiris/actions-gh-pages@v4
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: build/web
-          keep_files: true
-          commit_message: "web: ${{ github.ref_name }} ${{ github.sha }}"
-      - name: Deploy web (branch)
-        uses: peaceiris/actions-gh-pages@v4
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: build/web
-          destination_dir: branch/${{ env.BRANCH_SLUG }}
-          keep_files: true
-          commit_message: "web: ${{ github.ref_name }} ${{ github.sha }} (branch)"
+      - name: Deploy web to gh-pages (latest + branch copy, with retries)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git clone --depth 1 --branch gh-pages "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" pages
+          rsync -a build/web/ pages/                                   # root = latest push from any branch
+          mkdir -p "pages/branch/${BRANCH_SLUG}"
+          rsync -a --delete build/web/ "pages/branch/${BRANCH_SLUG}/"  # per-branch copy
+          touch pages/.nojekyll
+          cd pages
+          git add -A
+          git commit -q -m "web: ${{ github.ref_name }} ${{ github.sha }}" || { echo "nothing to deploy"; exit 0; }
+          for i in 1 2 3 4 5; do
+            if git push origin gh-pages; then exit 0; fi
+            echo "push failed (attempt $i), retrying"
+            sleep $((i * 15))
+            git pull --rebase origin gh-pages || true
+          done
+          exit 1
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
