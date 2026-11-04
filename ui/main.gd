@@ -308,6 +308,16 @@ func confirm(text: String, choices: Array) -> void:
 	open_overlay(p)
 
 
+## A light haptic tick, like a key press on a phone keyboard. `taps` > 1 gives a quick double tick.
+## Works on phones (Android app and mobile web; iOS browsers don't allow vibration). Off in settings.
+func haptic(taps: int = 1, ms: int = 15) -> void:
+	if not bool(settings.get("vibration", true)):
+		return
+	Input.vibrate_handheld(ms, 0.35)
+	for i in range(1, taps):
+		get_tree().create_timer(0.07 * i).timeout.connect(func(): Input.vibrate_handheld(ms, 0.35))
+
+
 ## Screen shake, kept to a gentle nudge (callers pass arcade-sized amounts).
 func shake(amount: float = 18.0) -> void:
 	_shake = maxf(_shake, minf(amount * 0.3, 8.0))

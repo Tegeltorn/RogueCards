@@ -979,6 +979,7 @@ func play_event(ev: Dictionary) -> float:
 			main.sfx.play("reward")
 			return 0.5
 		Ev.BLOCKED:
+			main.haptic(1)  # the attack plays out
 			if ev["exact"]:
 				main.flash(Color(1, 1, 1, 0.7), 0.35)
 				main.toast("EXACT!", Style.GOLD, 600)
@@ -988,6 +989,7 @@ func play_event(ev: Dictionary) -> float:
 				main.sfx.play("block")
 			return 0.55
 		Ev.DAMAGE_TAKEN:
+			main.haptic(2)  # the attack plays out
 			main.shake(28.0 if ev["lives"] >= 2 else 16.0)
 			main.flash(Color(Style.RED, 0.45), 0.4)
 			main.toast("-%d %s" % [ev["lives"], "LIFE" if ev["lives"] == 1 else "LIVES"], Style.RED, 600)
@@ -997,6 +999,7 @@ func play_event(ev: Dictionary) -> float:
 			main.toast("+%d SHIELD STORED" % ev["amount"], Style.BLUE, 680, 40)
 			return 0.25
 		Ev.ATTACK_SUCCEEDED:
+			main.haptic(1)  # the attack plays out
 			if ev["exact"]:
 				main.flash(Color(1, 1, 1, 0.7), 0.35)
 				main.toast("EXACT!", Style.GOLD, 600)
@@ -1017,6 +1020,7 @@ func play_event(ev: Dictionary) -> float:
 			main.sfx.play("play", 0.85)
 			return 0.55
 		Ev.ATTACK_FAILED:
+			main.haptic(1)  # the attack plays out
 			main.toast("The shield holds", Style.BLUE, 600, 48)
 			for id in _enemy_views:
 				var cv: CardView = _enemy_views[id]
@@ -1029,6 +1033,7 @@ func play_event(ev: Dictionary) -> float:
 			main.sfx.play("block", 0.7)
 			return 0.6
 		Ev.LOCKOUT:
+			main.haptic(2)  # the attack plays out
 			main.toast("LAST STAND!", Style.RED, 520)
 			main.shake(20.0)
 			main.sfx.play("hit", 0.8)
