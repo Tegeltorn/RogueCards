@@ -1,0 +1,183 @@
+extends RefCounted
+## Help texts and info overlays: short rules ("?"), card effect tooltip text,
+## the aces overlay (lives + sacrifice) and the modifiers overlay (mod ace + theme king).
+
+const Style := preload("res://ui/style.gd")
+const CardView := preload("res://ui/card_view.gd")
+const Balance := preload("res://engine/balance.gd")
+
+const JOKER_TEXT := {
+	"dual": "Joker: counts as both colours.",
+	"innate": "Joker: always in your first hand of a floor.",
+	"double": "Joker: worth double.",
+	"draw2": "Joker: draw 2 cards when played.",
+}
+
+
+## One or two lines describing what a hand card does right now.
+static func card_effect(e, c) -> String:
+	var b: Dictionary = e.state.balance
+	var v: int = c.value()
+	var lines: Array = []
+	match c.suit:
+		"H":
+			lines.append("Block %d. Leftover block is stored as shield for the next round." % v)
+		"D":
+			lines.append("Block %d and draw 1 card." % v)
+		"S":
+			lines.append("Attack %d (%d × %s, rounded down)." % [int(floor(v * float(b["spade_multiplier"]))), v, str(b["spade_multiplier"])])
+		"C":
+			lines.append("Attack %d. +%d if you play 2 or more clubs this round." % [v, int(b["club_pair_bonus"])])
+	if c.joker != "":
+		lines.append(JOKER_TEXT.get(c.joker, ""))
+	var bneed: int = e.block_need()
+	var aneed: int = e.attack_need()
+	if not e.is_effective(c):
+		if c.suit == "H":
+			lines.append("No attack to block: stores %d shield for the next round." % v)
+		elif c.suit == "D":
+			lines.append("No attack to block: it only draws a card.")
+		elif bneed > 0 and aneed == 0:
+			lines.append("No shield to break: no effect, it is just discarded.")
+	return "\n".join(lines)
+
+
+static func _panel_with_close(v: VBoxContainer, title: String) -> PanelContainer:
+	var p := Style.panel(v)
+	p.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	var t := Style.label(title, 38, Style.GOLD)
+	v.add_child(t)
+	v.move_child(t, 0)
+	var close := Style.button("Close", Style.BLACK, 26)
+	close.pressed.connect(p.queue_free)
+	v.add_child(close)
+	return p
+
+
+static func _text(bb: String, size: int = 24) -> RichTextLabel:
+	var rt := RichTextLabel.new()
+	rt.bbcode_enabled = true
+	rt.fit_content = true
+	rt.scroll_active = false
+	rt.text = bb
+	rt.add_theme_font_size_override("normal_font_size", size)
+	rt.add_theme_font_size_override("bold_font_size", size)
+	rt.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	return rt
+
+
+## The "?" overlay: short rules with the current balance values.
+static func rules_overlay(main) -> Control:
+	var b: Dictionary = main.engine.state.balance if main.engine != null else main.balance()
+	var txt := """[color=#f4b942]GOAL[/color]  Beat floors 3 → Queen, then the three kings (and the black joker).
+
+[color=#f4b942]EACH ROUND[/color]  An enemy card is revealed. [color=#e0383e]Black = attack[/color], [color=#3d8bfd]red = shield[/color]. Its rank is its value.
+• Draw up to %d cards (%d against the kings).
+• Play any cards. Only the right colour counts: red cards block attacks, black cards break shields.
+• Attack: if your block is lower, you lose a life (a miss of %d or more costs 2). The card is beaten either way.
+• Shield: break it with enough attack, or it goes to the bottom of the enemy pile. Fail when no black enemy cards are left and you lose a life (locked).
+• Keep up to %d unplayed card(s) for the next round.
+
+[color=#f4b942]SUITS[/color]
+♥ Block. Leftover block is stored as shield for the next round (with no attack: the full value).
+♦ Block and draw 1 card (also against a shield).
+♠ Attack × %s (rounded down).
+♣ Attack. +%d if you play 2 or more clubs.
+
+[color=#f4b942]LIVES[/color]  Your aces. Tap them to see them or to sacrifice one (it counts as %d for one round).
+
+[color=#f4b942]REWARDS[/color]  The suit of the last beaten card decides: ♠ pick any beaten card · ♣ reveal 2, take 1, remove 1 · ♥ heal a life · ♦ reveal 2, take both. Your deck holds up to %d cards.
+
+[color=#f4b942]KINGS[/color]  Tap the king to see your mod and the jokers.""" % [
+		int(b["hand_size"]), int(b["boss_hand_size"]), int(b["graded_threshold"]), int(b["retain"]),
+		str(b["spade_multiplier"]), int(b["club_pair_bonus"]), int(b["ace_value"]), int(b["deck_cap"])]
+	var v := VBoxContainer.new()
+	var scroll := ScrollContainer.new()
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.custom_minimum_size = Vector2(0, 820)
+	var rt := _text(txt, 24)
+	scroll.add_child(rt)
+	v.add_child(scroll)
+	return _panel_with_close(v, "How to play")
+
+
+## Lives overlay: remaining and lost aces, and the sacrifice buttons.
+static func aces_overlay(main) -> Control:
+	var e = main.engine
+	var s = e.state
+	var v := VBoxContainer.new()
+	var why := "Each ace is one life. Lose them all and the run ends.\n"
+	why += "Sacrifice: lose that life, and the ace counts as a %d this round (red blocks, black attacks)." % int(s.balance["ace_value"])
+	if not s.balance["ace_sac_enabled"] or not e.mod.can_ace_sac():
+		why += "\n[color=#e0383e]Sacrifice is disabled this run.[/color]"
+	elif s.lives.size() < 2:
+		why += "\n[color=#e0383e]You need at least 2 lives to sacrifice.[/color]"
+	v.add_child(_text(why, 22))
+	var usable: Array = e.sacrificable_aces()
+	var holder: Array = [null]  # lambdas capture by value; the array lets them reach the panel
+	for a in s.lives + s.lost_lives:
+		var lost: bool = s.lost_lives.has(a)
+		var row := HBoxContainer.new()
+		var cv := CardView.new()
+		cv.set_interactive(false)
+		cv.breathing = false
+		cv.setup(a, Vector2(70, 98))
+		if lost:
+			cv.face_up = false
+			cv.modulate.a = 0.4
+		row.add_child(cv)
+		var desc := "Lost" if lost else ("Blocks %d" % int(s.balance["ace_value"]) if a.base_red() else "Attacks %d" % int(s.balance["ace_value"]))
+		var l := Style.label(desc, 26, Style.MUTED if lost else Style.WHITE, HORIZONTAL_ALIGNMENT_LEFT)
+		l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(l)
+		if not lost:
+			var btn := Style.button("Sacrifice", Color("7a2a8c"), 24)
+			btn.custom_minimum_size = Vector2(190, 70)
+			btn.disabled = not usable.has(a)
+			var ace = a
+			btn.pressed.connect(func():
+				if holder[0]:
+					holder[0].queue_free()
+				main.confirm("Sacrifice %s?\nYou lose this life. It counts as %d this round." % [ace.label(), int(s.balance["ace_value"])],
+					[["Sacrifice", func(): main.act(func(): e.sacrifice_ace(ace.id)), Color("7a2a8c")],
+					["Cancel", Callable(), Style.BLACK]]))
+			row.add_child(btn)
+		v.add_child(row)
+	holder[0] = _panel_with_close(v, "Your aces (%d lives)" % s.lives.size())
+	return holder[0]
+
+
+## Modifiers overlay: the mod ace and the theme king's jokers.
+static func mods_overlay(main) -> Control:
+	var e = main.engine
+	var s = e.state
+	var jd: Dictionary = Balance.jokers().get(s.theme_suit, {})
+	var v := VBoxContainer.new()
+	var mod_row := HBoxContainer.new()
+	var mv := CardView.new()
+	mv.set_interactive(false)
+	mv.breathing = false
+	mv.setup(s.mod_ace, Vector2(90, 126))
+	mod_row.add_child(mv)
+	var mt := "[b]Mod ace: %s[/b]\n%s" % [e.mod.name, e.mod.desc] if s.balance["mods_enabled"] else "[b]Mod ace[/b]\nMods are disabled."
+	mod_row.add_child(_text(mt, 24))
+	v.add_child(mod_row)
+	var king_row := HBoxContainer.new()
+	var kv := CardView.new()
+	kv.set_interactive(false)
+	kv.breathing = false
+	kv.setup(s.theme_king, Vector2(90, 126))
+	king_row.add_child(kv)
+	var kt := "[b]Theme king: %s[/b]\n" % Style.SUIT_NAME.get(s.theme_suit, "")
+	if s.balance["jokers_enabled"]:
+		var red_state := "Comes after the Jack floor."
+		for c in s.deck:
+			if c.joker != "":
+				red_state = "Attached under %s." % c.label()
+		kt += "[color=#e0383e]Red joker:[/color] %s %s\n" % [jd.get("red", {}).get("desc", ""), red_state]
+		kt += "[b]Black joker[/b] (in the boss pile): %s" % jd.get("black", {}).get("desc", "")
+	else:
+		kt += "Jokers are disabled."
+	king_row.add_child(_text(kt, 24))
+	v.add_child(king_row)
+	return _panel_with_close(v, "Modifiers")

@@ -19,14 +19,14 @@ func enter() -> void:
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 18)
 	m.add_child(v)
-	var t := Style.label("SEGER!" if won else "FÖRLUST", 88, Style.GOLD if won else Style.RED)
+	var t := Style.label("VICTORY!" if won else "DEFEAT", 88, Style.GOLD if won else Style.RED)
 	t.add_theme_constant_override("outline_size", 16)
 	v.add_child(t)
 	var rows := [
-		["Våning", "Kungen (vann)" if won else Style.floor_text(s.floor_num)],
-		["Liv kvar", str(s.lives.size())],
-		["Temakung", Style.SUIT_SYM[s.theme_suit] + " " + Style.SUIT_NAME[s.theme_suit]],
-		["Modess", Style.SUIT_SYM[s.mod_suit] + " " + _mod_name()],
+		["Floor", "King (won)" if won else Style.floor_text(s.floor_num)],
+		["Lives left", str(s.lives.size())],
+		["Theme king", Style.SUIT_SYM[s.theme_suit] + " " + Style.SUIT_NAME[s.theme_suit]],
+		["Mod ace", Style.SUIT_SYM[s.mod_suit] + " " + _mod_name()],
 		["Seed", str(s.seed_value)],
 	]
 	var grid := GridContainer.new()
@@ -40,7 +40,7 @@ func enter() -> void:
 	var center := CenterContainer.new()
 	center.add_child(grid)
 	v.add_child(center)
-	v.add_child(Style.label("Slutlek", 28, Style.MUTED))
+	v.add_child(Style.label("Final deck", 28, Style.MUTED))
 	var flow := HFlowContainer.new()
 	flow.alignment = FlowContainer.ALIGNMENT_CENTER
 	flow.add_theme_constant_override("h_separation", 10)
@@ -57,20 +57,20 @@ func enter() -> void:
 	var spacer := Control.new()
 	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	v.add_child(spacer)
-	var again := Style.button("Ny omgång", Style.RED, 36)
+	var again := Style.button("New run", Style.RED, 36)
 	again.custom_minimum_size.y = 92
 	again.pressed.connect(func(): main.new_run())
 	v.add_child(again)
 	var h := HBoxContainer.new()
-	var same := Style.button("Samma seed", Style.BLUE, 26)
+	var same := Style.button("Same seed", Style.BLUE, 26)
 	same.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	same.pressed.connect(func(): main.new_run(s.seed_value))
 	h.add_child(same)
-	var log := Style.button("Logg", Style.BLACK, 26)
+	var log := Style.button("Log", Style.BLACK, 26)
 	log.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	log.pressed.connect(func(): main.open_log())
 	h.add_child(log)
-	var menu := Style.button("Meny", Style.BLACK, 26)
+	var menu := Style.button("Menu", Style.BLACK, 26)
 	menu.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	menu.pressed.connect(func(): main.quit_to_menu())
 	h.add_child(menu)

@@ -1,5 +1,5 @@
 extends RefCounted
-## Event types emitted by the engine, plus human-readable (Swedish) descriptions for the log.
+## Event types emitted by the engine, plus human-readable descriptions for the log.
 
 const RUN_STARTED := "run_started"
 const MOD_REVEALED := "mod_revealed"
@@ -40,51 +40,51 @@ const SUIT_NAME := {"H": "♥", "D": "♦", "S": "♠", "C": "♣", "J": "Joker"
 
 static func floor_name(f: int) -> String:
 	match f:
-		11: return "Knekt"
-		12: return "Dam"
-		13: return "Kung"
+		11: return "Jack"
+		12: return "Queen"
+		13: return "King"
 	return str(f)
 
 
 static func describe(e: Dictionary) -> String:
 	var t: String = e.get("type", "")
 	match t:
-		RUN_STARTED: return "Ny omgång, seed %s" % str(e.get("seed"))
-		MOD_REVEALED: return "Modess: %s (%s)" % [SUIT_NAME.get(e.get("suit"), "?"), e.get("name", "")]
-		THEME_REVEALED: return "Temakung: %s" % SUIT_NAME.get(e.get("suit"), "?")
-		SETUP_PICK: return "Välj en extra trea till leken"
-		SETUP_PICKED: return "Tog %s till leken" % e.get("card", "")
-		FLOOR_STARTED: return "— Våning %s (%d kort) —" % [floor_name(e.get("floor", 0)), e.get("count", 0)]
+		RUN_STARTED: return "New run, seed %s" % str(e.get("seed"))
+		MOD_REVEALED: return "Mod ace: %s (%s)" % [SUIT_NAME.get(e.get("suit"), "?"), e.get("name", "")]
+		THEME_REVEALED: return "Theme king: %s" % SUIT_NAME.get(e.get("suit"), "?")
+		SETUP_PICK: return "Pick an extra three for your deck"
+		SETUP_PICKED: return "Added %s to the deck" % e.get("card", "")
+		FLOOR_STARTED: return "— Floor %s (%d cards) —" % [floor_name(e.get("floor", 0)), e.get("count", 0)]
 		ENEMY_REVEALED:
-			return "Fiende: %s (%s %d), %d kvar" % [e.get("card", ""),
-				"attack" if e.get("intent") == "attack" else "sköld", e.get("value", 0), e.get("left", 0)]
-		JOKER_TRIGGERED: return "Svart joker: %s" % e.get("desc", "")
-		DECK_RESHUFFLED: return "Slänghögen blandas till ny dragbunt"
-		CARD_DRAWN: return "Drog %s" % e.get("card", "")
+			return "Enemy: %s (%s %d), %d in pile" % [e.get("card", ""),
+				"attack" if e.get("intent") == "attack" else "shield", e.get("value", 0), e.get("left", 0)]
+		JOKER_TRIGGERED: return "Black joker: %s" % e.get("desc", "")
+		DECK_RESHUFFLED: return "Discard pile shuffled into a new draw pile"
+		CARD_DRAWN: return "Drew %s" % e.get("card", "")
 		HAND_FILLED: return "Hand: %s" % ", ".join(e.get("hand", []))
-		CARDS_PLAYED: return "Spelade %s" % ", ".join(e.get("cards", []))
-		ACE_SACRIFICED: return "Offrade %s (värde %d)" % [e.get("card", ""), e.get("value", 0)]
-		BLOCKED: return "Blockerade %d mot %d" % [e.get("block", 0), e.get("attack", 0)]
-		DAMAGE_TAKEN: return "Miss med %d: -%d liv" % [e.get("miss", 0), e.get("lives", 0)]
-		SHIELD_STORED: return "Sparad sköld: %d" % e.get("amount", 0)
-		ATTACK_SUCCEEDED: return "Attack %d mot sköld %d: besegrad" % [e.get("attack", 0), e.get("shield", 0)]
-		ATTACK_FAILED: return "Attack %d mot sköld %d: läggs sist" % [e.get("attack", 0), e.get("shield", 0)]
-		LOCKOUT: return "Låst! Inga svarta kort kvar: -1 liv, skölden räknas som besegrad"
-		ENEMY_DEFEATED: return "Besegrade %s" % e.get("card", "")
-		LIFE_LOST: return "Förlorade liv (%s), %d kvar" % [e.get("card", ""), e.get("lives", 0)]
-		LIFE_RESTORED: return "Fick tillbaka liv (%s), %d liv" % [e.get("card", ""), e.get("lives", 0)]
-		RETAINED: return "Sparade %s" % ", ".join(e.get("cards", [])) if not e.get("cards", []).is_empty() else "Sparade inget"
-		FLOOR_CLEARED: return "Våning %s klar, sista kortet: %s" % [floor_name(e.get("floor", 0)), e.get("last", "")]
-		REWARD_OFFERED: return "Belöning (%s): %s" % [SUIT_NAME.get(e.get("suit"), "?"), ", ".join(e.get("options", []))]
+		CARDS_PLAYED: return "Played %s" % ", ".join(e.get("cards", []))
+		ACE_SACRIFICED: return "Sacrificed %s (value %d)" % [e.get("card", ""), e.get("value", 0)]
+		BLOCKED: return "Blocked %d against %d" % [e.get("block", 0), e.get("attack", 0)]
+		DAMAGE_TAKEN: return "Missed by %d: -%d lives" % [e.get("miss", 0), e.get("lives", 0)]
+		SHIELD_STORED: return "Stored shield: %d" % e.get("amount", 0)
+		ATTACK_SUCCEEDED: return "Attack %d vs shield %d: broken" % [e.get("attack", 0), e.get("shield", 0)]
+		ATTACK_FAILED: return "Attack %d vs shield %d: goes to the bottom" % [e.get("attack", 0), e.get("shield", 0)]
+		LOCKOUT: return "Locked! No black cards left: -1 life, the shield counts as beaten"
+		ENEMY_DEFEATED: return "Defeated %s" % e.get("card", "")
+		LIFE_LOST: return "Lost a life (%s), %d left" % [e.get("card", ""), e.get("lives", 0)]
+		LIFE_RESTORED: return "Life restored (%s), %d lives" % [e.get("card", ""), e.get("lives", 0)]
+		RETAINED: return "Kept %s" % ", ".join(e.get("cards", [])) if not e.get("cards", []).is_empty() else "Kept nothing"
+		FLOOR_CLEARED: return "Floor %s cleared, last card: %s" % [floor_name(e.get("floor", 0)), e.get("last", "")]
+		REWARD_OFFERED: return "Reward (%s): %s" % [SUIT_NAME.get(e.get("suit"), "?"), ", ".join(e.get("options", []))]
 		REWARD_TAKEN:
 			if e.get("replaced", "") != "":
-				return "Tog %s, bytte ut %s" % [e.get("card", ""), e.get("replaced", "")]
-			return "Tog %s" % e.get("card", "")
-		REWARD_SKIPPED: return "Avstod belöning"
-		CARD_REMOVED: return "Tog bort %s ur leken" % e.get("card", "")
-		JOKER_OFFERED: return "Röd joker: fäst under ett kort (%s)" % e.get("desc", "")
-		JOKER_ATTACHED: return "Röd joker fäst under %s" % e.get("card", "")
-		RUN_WON: return "SEGER!"
-		RUN_LOST: return "Förlust på våning %s" % floor_name(e.get("floor", 0))
+				return "Took %s, swapped out %s" % [e.get("card", ""), e.get("replaced", "")]
+			return "Took %s" % e.get("card", "")
+		REWARD_SKIPPED: return "Declined reward"
+		CARD_REMOVED: return "Removed %s from the deck" % e.get("card", "")
+		JOKER_OFFERED: return "Red joker: attach it under a card (%s)" % e.get("desc", "")
+		JOKER_ATTACHED: return "Red joker attached under %s" % e.get("card", "")
+		RUN_WON: return "VICTORY!"
+		RUN_LOST: return "Defeated on floor %s" % floor_name(e.get("floor", 0))
 		DEBUG: return "[debug] %s" % e.get("msg", "")
 	return t

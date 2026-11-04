@@ -22,7 +22,7 @@ var state: GameState
 var rng: Rng
 var mod: ModBase
 var record_events := true  # the simulator turns this off for speed
-var _excluded: Dictionary = {}  # rank -> Array of suits removed from enemy floors (Rik mod)
+var _excluded: Dictionary = {}  # rank -> Array of suits removed from enemy floors (Rich mod)
 var _boss_pile: Array = []
 
 
@@ -171,7 +171,8 @@ func _next_round() -> void:
 	for c in state.current:
 		_emit(Ev.ENEMY_REVEALED, {"card": c.label(), "id": c.id, "rank": c.rank, "suit": c.suit,
 			"intent": "attack" if c.base_black() else "shield", "value": enemy_value(c),
-			"left": state.enemy_pile.size(), "virtual": c.from_joker})
+			"left": state.enemy_pile.size(), "total_left": state.enemy_pile.size() + state.current.size(),
+			"virtual": c.from_joker})
 	# Fill the hand.
 	state.hand = state.retained
 	state.retained = []
@@ -252,16 +253,21 @@ func attack_need() -> int:
 	return n
 
 
+## Any card in hand may be played (e.g. ♦ on a shield just to draw, ♥ on a shield to store shield).
 func can_play_card(c) -> bool:
-	if state.phase != Phase.PLAY or not state.hand.has(c):
-		return false
+	return state.phase == Phase.PLAY and state.hand.has(c)
+
+
+## True if the card counts against the revealed enemy (right colour: red vs attack, black vs shield).
+func is_effective(c) -> bool:
 	return (block_need() > 0 and c.is_red()) or (attack_need() > 0 and c.is_black())
 
 
+## Cards in hand that count against the current enemy (used by the bot and for highlighting).
 func playable_cards() -> Array:
 	var out: Array = []
 	for c in state.hand:
-		if can_play_card(c):
+		if can_play_card(c) and is_effective(c):
 			out.append(c)
 	return out
 
@@ -363,7 +369,7 @@ func preview(selected_ids: Array) -> Dictionary:
 
 # ---------------------------------------------------------------- actions
 
-## Moves cards from hand to the table. ♦ (when blocking) and draw2 cards draw immediately.
+## Moves cards from hand to the table. ♦ and draw2 cards draw immediately.
 func play_cards(ids: Array) -> bool:
 	if state.phase != Phase.PLAY:
 		return false
@@ -381,7 +387,7 @@ func play_cards(ids: Array) -> bool:
 	_emit(Ev.CARDS_PLAYED, {"cards": _labels(cards), "ids": _ids(cards)})
 	var draws := 0
 	for c in cards:
-		if c.suit == "D" and block_need() > 0:
+		if c.suit == "D":
 			draws += 1
 		if c.joker == "draw2":
 			draws += 2
@@ -435,6 +441,10 @@ func resolve() -> bool:
 		state.carry_shield = new_carry
 		if new_carry > 0:
 			_emit(Ev.SHIELD_STORED, {"amount": new_carry})
+	elif int(t["hearts"]) > 0:
+		# ♥ played with no attack to block: the whole heart value is stored (replaces older shield).
+		state.carry_shield = int(t["hearts"])
+		_emit(Ev.SHIELD_STORED, {"amount": state.carry_shield})
 	elif b["heart_carry_mode"] == "next_round":
 		state.carry_shield = 0
 	if aneed > 0:
@@ -662,7 +672,7 @@ func attach_joker(card_id: int) -> bool:
 # ---------------------------------------------------------------- debug
 
 func debug_jump_to_floor(f: int) -> void:
-	_emit(Ev.DEBUG, {"msg": "hoppar till våning %d" % f})
+	_emit(Ev.DEBUG, {"msg": "jumping to floor %d" % f})
 	state.reward = {}
 	_start_floor(clampi(f, GameState.FIRST_FLOOR, GameState.BOSS_FLOOR))
 
@@ -673,7 +683,7 @@ func debug_give_life() -> void:
 		state.lives.append(a)
 		_emit(Ev.LIFE_RESTORED, {"card": a.label(), "id": a.id, "lives": state.lives.size()})
 	else:
-		_emit(Ev.DEBUG, {"msg": "inga förlorade liv att ge tillbaka"})
+		_emit(Ev.DEBUG, {"msg": "no lost lives to restore"})
 
 
 # ---------------------------------------------------------------- helpers

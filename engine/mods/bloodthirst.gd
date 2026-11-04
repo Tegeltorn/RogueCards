@@ -1,5 +1,5 @@
 extends "res://engine/mods/mod_base.gd"
-## ♠ Blodtörst: your attacks +1, enemy attacks +1.
+## ♠ Bloodthirst: your attacks +1, enemy attacks +1.
 
 
 func modify_player_attack(total: int) -> int:

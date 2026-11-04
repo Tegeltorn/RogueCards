@@ -1,6 +1,6 @@
 # RogueCards
 
-A solo roguelike deckbuilder played with a standard 54-card deck. This repo is a mobile playtest prototype made in Godot 4. The rules are also playable on a table: see [`RULES.md`](RULES.md) (Swedish).
+A solo roguelike deckbuilder played with a standard 54-card deck. This repo is a mobile playtest prototype made in Godot 4. The rules are also playable on a table: see [`RULES.md`](RULES.md).
 
 ## Play
 - **Web (phone browser):** https://tegeltorn.github.io/RogueCards/ always has the latest push from any branch. Each branch also gets its own copy at `https://tegeltorn.github.io/RogueCards/branch/<branch>/`.

@@ -33,7 +33,8 @@ xvfb-run -a -s "-screen 0 800x1400x24" godot --path . --resolution 720x1280 --re
 
 ## Design constraints
 - **Tabletop:** every rule must be playable by hand with a real 54-card deck. Use only the cards, integers and simple maths. Tuning may only touch knobs visible on the table.
-- `RULES.md` (Swedish tabletop rules) must match `balance.json`. `tests/test_rules_doc.gd` enforces this, so update both together.
+- `RULES.md` (tabletop rules) must match `balance.json`. `tests/test_rules_doc.gd` enforces this, so update both together.
+- Language: the whole game, the event log and the docs are in English.
 - **Balance target:** bot win rate within `target.bot_win_rate_band` (15–22 %). Humans should land around 25 %. Use `sim/tune.gd` for sweeps. The spec's original values are in `config/presets/spec.json`.
 - No assets, names or fonts from other games. Fonts must be OFL and listed in `CREDITS.md`.
 

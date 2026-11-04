@@ -5,7 +5,7 @@ extends Control
 signal tapped(view)
 
 const Style := preload("res://ui/style.gd")
-const JOKER_TAG := {"dual": "♥♠", "innate": "1:a", "double": "x2", "draw2": "+2"}
+const JOKER_TAG := {"dual": "♥♠", "innate": "1st", "double": "x2", "draw2": "+2"}
 
 var card_id: int = -1
 var rank: int = 2

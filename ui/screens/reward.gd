@@ -8,10 +8,10 @@ const Ev := preload("res://engine/events.gd")
 const Phase := GameState.Phase
 
 const RULE_TEXT := {
-	"S": "Välj fritt bland alla besegrade kort",
-	"C": "Vänd upp 2, ta 1 – ta sedan bort 1 kort ur leken",
-	"H": "Få tillbaka ett liv (alla liv: vänd upp 2, ta 1)",
-	"D": "Vänd upp 2 och ta båda",
+	"S": "Pick any of the beaten cards",
+	"C": "Reveal 2, take 1 – then remove 1 card from your deck",
+	"H": "Get a life back (all lives: reveal 2, take 1)",
+	"D": "Reveal 2 and take both",
 }
 
 var main
@@ -54,7 +54,7 @@ func enter() -> void:
 	_opts.add_theme_constant_override("h_separation", 16)
 	_opts.add_theme_constant_override("v_separation", 16)
 	_v.add_child(_opts)
-	_skip = Style.button("Avstå", Style.BLACK, 28)
+	_skip = Style.button("Decline", Style.BLACK, 28)
 	_skip.pressed.connect(_on_skip)
 	_v.add_child(_skip)
 	_deck_label = Style.label("", 26, Style.MUTED)
@@ -75,24 +75,24 @@ func refresh() -> void:
 		c.queue_free()
 	for c in _deck.get_children():
 		c.queue_free()
-	_title.text = "VÅNING %s KLAR" % Style.floor_text(s.floor_num)
+	_title.text = "FLOOR %s CLEARED" % Style.floor_text(s.floor_num)
 	_skip.visible = false
 	var deck_tap := Callable()
 	match s.phase:
 		Phase.REWARD:
 			var r: Dictionary = s.reward
 			var suit: String = r.get("suit", "S")
-			_sub.text = "Sista kortet %s → %s" % [Style.SUIT_SYM[suit], RULE_TEXT[suit]]
+			_sub.text = "Last card %s → %s" % [Style.SUIT_SYM[suit], RULE_TEXT[suit]]
 			var healed: int = int(_last_offer().get("healed", 0))
 			if healed > 0:
-				_sub.text += "\nDu fick tillbaka %d liv!" % healed
+				_sub.text += "\nYou got %d life back!" % healed
 			var picks := int(r.get("picks", 0))
 			if _swap_for >= 0 and s.find_in(r["options"], _swap_for) != null:
-				_prompt.text = "Leken är full: tryck på kortet som ska bytas ut"
+				_prompt.text = "Your deck is full: tap the card to swap out"
 				deck_tap = func(card): _take(_swap_for, card.id)
 			else:
 				_swap_for = -1
-				_prompt.text = "Välj %d kort" % picks if picks > 1 else "Välj ett kort"
+				_prompt.text = "Take %d cards" % picks if picks > 1 else "Take a card"
 			for i in r["options"].size():
 				var o = r["options"][i]
 				var cv := CardView.new()
@@ -102,15 +102,15 @@ func refresh() -> void:
 				_opts.add_child(cv)
 				cv.land(i * 0.08)
 			_skip.visible = _e.can_decline()
-			_skip.text = "Avstå" if _swap_for < 0 else "Avstå det här kortet"
+			_skip.text = "Decline" if _swap_for < 0 else "Decline this card"
 		Phase.REWARD_REMOVE:
-			_sub.text = "Klöverbelöning"
-			_prompt.text = "Ta bort ett kort ur leken"
+			_sub.text = "Clubs reward"
+			_prompt.text = "Remove a card from your deck"
 			deck_tap = func(card): main.act(func(): _e.reward_remove(card.id))
 		Phase.JOKER_ATTACH:
-			_title.text = "RÖD JOKER"
+			_title.text = "RED JOKER"
 			_sub.text = _joker_desc()
-			_prompt.text = "Fäst jokern under ett kort i leken"
+			_prompt.text = "Attach the joker under a card in your deck"
 			var jv := CardView.new()
 			jv.set_interactive(false)
 			jv.rank = 0
@@ -119,7 +119,7 @@ func refresh() -> void:
 			_opts.add_child(jv)
 			jv.land()
 			deck_tap = func(card): main.act(func(): _e.attach_joker(card.id))
-	_deck_label.text = "Din lek (%d/%d)" % [s.deck.size(), int(s.balance["deck_cap"])]
+	_deck_label.text = "Your deck (%d/%d)" % [s.deck.size(), int(s.balance["deck_cap"])]
 	var sorted: Array = s.deck.duplicate()
 	sorted.sort_custom(func(a, b): return a.suit < b.suit or (a.suit == b.suit and a.rank < b.rank))
 	for c in sorted:
@@ -182,6 +182,6 @@ func play_event(ev: Dictionary) -> float:
 			main.sfx.play("reward")
 			return 0.2
 		Ev.LIFE_RESTORED:
-			main.toast("+1 LIV", Style.RED, 400)
+			main.toast("+1 LIFE", Style.RED, 400)
 			return 0.4
 	return 0.0

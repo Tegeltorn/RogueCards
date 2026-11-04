@@ -1,78 +1,80 @@
-# RogueCards – regler för bordet
+# RogueCards – tabletop rules
 
-Spelas solo med en vanlig kortlek (52 kort + 2 jokrar). Allt som behövs är korten.
+A solo game for a standard deck (52 cards + 2 jokers). You need nothing but the cards.
 
-## Uppställning
-1. **Startlek:** de fyra tvåorna (2♥ 2♦ 2♠ 2♣), blandade.
-2. **Modess:** blanda de fyra essen och dra ett. Dess färg ger omgångens mod (se nedan). Lägg sedan `lives` av de andra essen framför dig som **liv**.
-3. **Temakung:** blanda de fyra kungarna och dra en. Dess färg styr jokrarna.
-4. **Bosshög:** de tre andra kungarna plus den svarta jokern. Den röda jokern läggs åt sidan.
-5. **Fiender:** valörerna 3 till dam, en hög per valör. På våningarna i `short_floors` blandar du högen och tar bort ett kort, så att tre är kvar.
+## Setup
+1. **Starting deck:** the four twos (2♥ 2♦ 2♠ 2♣), shuffled.
+2. **Mod ace:** shuffle the four aces and draw one. Its suit sets the run's mod (see below). Put `lives` of the other aces in front of you as your **lives**.
+3. **Theme king:** shuffle the four kings and draw one. Its suit decides the jokers.
+4. **Boss pile:** the other three kings plus the black joker. Put the red joker aside.
+5. **Enemies:** ranks 3 to Queen, one pile per rank. On the floors in `short_floors`, shuffle the pile and remove one card so that three are left.
 
-## Våning och runda
-Våningarna går i ordning 3, 4 … 10, knekt, dam och sist kungen. **I början av varje våning** blandas hela leken till en ny dragbunt. Slänghögen töms och sparade kort och sparad sköld nollställs.
+## Floors and rounds
+Play the floors in order: 3, 4 … 10, Jack, Queen and finally the kings. **At the start of each floor** shuffle your whole deck into a new draw pile. The discard pile is emptied, and kept cards and stored shield are reset.
 
-Varje runda:
-1. **Vänd upp** fiendens översta kort. Svart = attack, rött = sköld. Värdet är valören.
-2. **Fyll handen** till `hand_size` kort (`boss_hand_size` mot kungarna). Är dragbunten tom blandar du slänghögen till en ny.
-3. **Spela** valfritt antal kort av rätt färg: röda mot attack, svarta mot sköld.
-   - **Attack:** räcker ditt block klarar du dig, annars tar du skada. Kortet är besegrat i båda fallen.
-   - **Sköld:** räcker din attack är skölden besegrad. Annars läggs kortet sist i fiendens hög.
-   - **Låst:** misslyckas du mot en sköld och det inte finns några svarta kort kvar i fiendens hög, förlorar du 1 liv och skölden räknas som besegrad.
-4. **Spara** upp till `retain` ospelade kort. Resten och de spelade korten går till slänghögen.
+Each round:
+1. **Reveal** the top enemy card. Black = attack, red = shield. Its value is its rank.
+2. **Fill your hand** up to `hand_size` cards (`boss_hand_size` against the kings). If the draw pile is empty, shuffle the discard pile into a new one.
+3. **Play** any cards you like. Only the right colour counts against the enemy: red cards block attacks, black cards break shields. Cards of the wrong colour still trigger their own effects (♦ draws, ♥ stores shield).
+   - **Attack:** if your block is enough you are safe, otherwise you take damage. The enemy card is beaten either way.
+   - **Shield:** if your attack is enough the shield is beaten. Otherwise it goes to the bottom of the enemy pile.
+   - **Locked:** if you fail against a shield and there are no black cards left in the enemy pile, lose 1 life and the shield counts as beaten.
+4. **Keep** up to `retain` unplayed cards. The rest of your hand and every played card go to the discard pile.
 
-| Färg | Effekt |
+| Suit | Effect |
 |---|---|
-| ♥ | Block. Överskottet sparas som sköld **till nästa runda** (högst hjärterkortens summa). Låt hjärtrena ligga kvar som påminnelse. |
-| ♦ | Block. Dra 1 kort per ruter du spelar. De dragna korten kan spelas samma runda. |
-| ♠ | Attack. Värdet × 1,5, avrundat nedåt (2→3, 3→4, 5→7 …). |
-| ♣ | Attack. +`club_pair_bonus` om du spelar minst två klöver samma runda. |
+| ♥ | Block. Leftover block is stored as shield **for the next round** (at most the hearts' total). With no attack to block, the hearts' full value is stored. Leave the hearts face up as a reminder. |
+| ♦ | Block. Draw 1 card for each diamond you play, even against a shield. The drawn cards can be played this round. |
+| ♠ | Attack. Value × 1.5, rounded down (2→3, 3→4, 5→7 …). |
+| ♣ | Attack. +`club_pair_bonus` if you play at least two clubs in the same round. |
 
-**Skada:** en miss med 1 till `graded_threshold` − 1 kostar 1 liv. En större miss kostar 2 liv. Lägg förlorade ess åt sidan. När inga ess är kvar har du förlorat.
+Black cards played against an attack do nothing; they are just discarded.
 
-**Essoffer:** när du har minst 2 liv kan du offra ett livs-ess under en runda. Du förlorar livet, och esset räknas som ett kort med värdet 14 i sin egen färg den rundan (rött blockar, svart attackerar).
+**Damage:** a miss of 1 to `graded_threshold` − 1 costs 1 life. A bigger miss costs 2 lives. Put lost aces aside. When you have no aces left, you lose.
 
-## Belöning (efter varje våning utom kungens)
-Färgen på det **sista besegrade fiendekortet** bestämmer belöningen. Du väljer bland våningens besegrade kort.
+**Ace sacrifice:** while you have at least 2 lives you may sacrifice a life ace during a round. You lose that life, and the ace counts as a card worth 14 in its own colour for that round (red blocks, black attacks).
 
-| Sista kortet | Belöning |
+## Rewards (after every floor except the kings)
+The suit of the **last beaten enemy card** decides the reward. You choose among the floor's beaten cards.
+
+| Last card | Reward |
 |---|---|
-| ♠ | Välj fritt bland alla besegrade kort. |
-| ♣ | Vänd upp 2, ta 1. Ta sedan bort 1 valfritt kort ur leken. |
-| ♥ | Få tillbaka ett förlorat liv. Har du alla liv: vänd upp 2 och ta 1. |
-| ♦ | Vänd upp 2 och ta båda. |
+| ♠ | Pick any of the beaten cards. |
+| ♣ | Reveal 2, take 1. Then remove 1 card of your choice from your deck. |
+| ♥ | Get one lost life back. With all lives: reveal 2 and take 1. |
+| ♦ | Reveal 2 and take both. |
 
-Har leken färre än `deck_cap` kort måste du lägga till det nya kortet. Är leken full byter du ut ett kort mot det nya, eller avstår. Leken får aldrig bli mindre än `deck_min` kort.
+If your deck has fewer than `deck_cap` cards you must add the new card. When it is full, swap a card out for the new one or decline. Your deck can never shrink below `deck_min` cards.
 
-## Jokrar och kungen
-| Tema | Röd joker (efter knektvåningen: lägg den under valfritt kort i leken) | Svart joker (i bosshögen) |
+## Jokers and the kings
+| Theme | Red joker (after the Jack floor: put it under any card in your deck) | Black joker (in the boss pile) |
 |---|---|---|
-| ♥ | Kortet räknas som båda färgerna | Den senast besegrade kungen läggs sist i bosshögen |
-| ♦ | Kortet hamnar alltid i första handen på varje våning | Sköld 14 |
-| ♠ | Kortet har dubbelt värde | Attack 14 |
-| ♣ | Dra 2 kort när kortet spelas | Vänd upp de två nästa korten och klara båda med samma hand |
+| ♥ | The card counts as both colours | The last beaten king goes back to the bottom of the boss pile |
+| ♦ | The card is always in your first hand of each floor | Shield 14 |
+| ♠ | The card is worth double | Attack 14 |
+| ♣ | Draw 2 cards when the card is played | Reveal the next two cards and beat both with the same hand |
 
-Besegrar du hela bosshögen har du vunnit.
+Beat the whole boss pile to win.
 
-## Mods (modesset)
-| Modess | Mod |
+## Mods (mod ace)
+| Mod ace | Mod |
 |---|---|
-| ♥ Härdad | Hjärterbelöningen läker 2 liv, men essoffer är avstängt. |
-| ♦ Rik | Välj en extra trea till startleken. Våning 3 består då av de tre andra treorna. Ruterbelöningen ger bara 1 kort. |
-| ♠ Blodtörst | Din attack får +1, men varje fiendeattack får också +1. |
-| ♣ Förutseende | Du ser de två nästa fiendekorten, men får inte spara kort. |
+| ♥ Hardened | The ♥ reward heals 2 lives, but ace sacrifice is disabled. |
+| ♦ Rich | Pick an extra three for your starting deck. Floor 3 is then the other three threes. The ♦ reward gives only 1 card. |
+| ♠ Bloodthirst | Your attack gets +1, but every enemy attack also gets +1. |
+| ♣ Foresight | You see the next two enemy cards, but you can't keep cards between rounds. |
 
-## Aktuella balansvärden
-De här värdena hålls i synk med `config/balance.json` av ett test.
+## Current balance values
+A test keeps these values in sync with `config/balance.json`.
 
-| Nyckel | Värde | Betydelse |
+| Key | Value | Meaning |
 |---|---|---|
-| `hand_size` | 4 | Handstorlek |
-| `boss_hand_size` | 3 | Handstorlek mot kungarna |
-| `retain` | 1 | Kort du får spara mellan rundor |
-| `deck_cap` | 9 | Max antal kort i leken |
-| `deck_min` | 4 | Min antal kort i leken |
-| `lives` | 3 | Antal livs-ess |
-| `short_floors` | [3,4,5] | Våningar med bara 3 fiender |
-| `graded_threshold` | 5 | Miss som kostar 2 liv |
-| `club_pair_bonus` | 2 | Klöverbonus |
+| `hand_size` | 4 | Hand size |
+| `boss_hand_size` | 3 | Hand size against the kings |
+| `retain` | 1 | Cards you may keep between rounds |
+| `deck_cap` | 9 | Max cards in your deck |
+| `deck_min` | 4 | Min cards in your deck |
+| `lives` | 3 | Number of life aces |
+| `short_floors` | [3,4,5] | Floors with only 3 enemies |
+| `graded_threshold` | 5 | Miss that costs 2 lives |
+| `club_pair_bonus` | 2 | Clubs bonus |

@@ -10,11 +10,31 @@ func test_block_exact_no_damage() -> void:
 	check(has_event(e, Ev.BLOCKED), "blocked event")
 
 
-func test_only_right_colour_playable() -> void:
-	var e := scenario(["5D", "4S"], ["8S"])
-	check(e.can_play_card(e.state.hand[0]), "red vs attack")
-	check(not e.can_play_card(e.state.hand[1]), "black vs attack")
-	check(not e.play_cards([e.state.hand[1].id]), "play black vs attack rejected")
+func test_any_card_playable_but_only_right_colour_counts() -> void:
+	var e := scenario(["5D", "4S"], ["8S"], {}, {"pile": ["9S"]})
+	check(e.can_play_card(e.state.hand[1]), "black card may be played vs attack")
+	check(e.is_effective(e.state.hand[0]), "red counts vs attack")
+	check(not e.is_effective(e.state.hand[1]), "black does not count vs attack")
+	eq(e.playable_cards().size(), 1, "only effective cards listed for the bot")
+	check(e.play_cards([e.state.hand[1].id]), "play black vs attack")
+	eq(int(e.compute(e.state.played)["block"]), 0, "black adds no block")
+
+
+func test_diamond_draws_against_shield() -> void:
+	var e := scenario(["3D"], ["9H"], {}, {"pile": ["5S"]})
+	e.state.draw_pile = cards(e, ["6S"])
+	e.play_cards([e.state.hand[0].id])
+	eq(e.state.hand.size(), 1, "♦ draws even against a shield")
+
+
+func test_hearts_on_shield_store_full_value() -> void:
+	var e := scenario(["6H", "2S"], ["3H"], {}, {"pile": ["7S"]})
+	e.play_cards(ids(e.state.hand))  # 2♠ = 3 attack beats shield 3, 6♥ stored
+	e.resolve()
+	eq(e.state.carry_shield, 6, "full heart value stored")
+	# Next round (attack 7): the stored 6 counts as block before any card is played.
+	eq(e.block_need(), 7, "next enemy")
+	eq(int(e.compute([])["block"]), 6, "stored shield counts")
 
 
 func test_miss_small_costs_one_life() -> void:

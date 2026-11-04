@@ -29,19 +29,19 @@ func enter() -> void:
 
 	var mod_ev := _find_event("mod_revealed")
 	var theme_ev := _find_event("theme_revealed")
-	_v.add_child(_reveal_block(s.mod_ace, "MODESS", mod_ev.get("name", "") if mod_ev.get("active", true) else "Mods avstängda",
+	_v.add_child(_reveal_block(s.mod_ace, "MOD ACE", mod_ev.get("name", "") if mod_ev.get("active", true) else "Mods disabled",
 		mod_ev.get("desc", "") if mod_ev.get("active", true) else "", 0.3))
 	var jt := ""
 	if theme_ev.get("active", true):
-		jt = "Röd joker (efter knekt): %s\nSvart joker (bossen): %s" % [theme_ev.get("red", ""), theme_ev.get("black", "")]
+		jt = "Red joker (after the Jack floor): %s\nBlack joker (boss): %s" % [theme_ev.get("red", ""), theme_ev.get("black", "")]
 	else:
-		jt = "Jokrar avstängda"
-	_v.add_child(_reveal_block(s.theme_king, "TEMAKUNG", Style.SUIT_NAME.get(s.theme_suit, "") + "kung", jt, 0.9))
+		jt = "Jokers disabled"
+	_v.add_child(_reveal_block(s.theme_king, "THEME KING", "King of " + Style.SUIT_NAME.get(s.theme_suit, ""), jt, 0.9))
 
-	var lives := "Liv: " + "  ".join(s.lives.map(func(a): return "A" + Style.SUIT_SYM[a.suit]))
+	var lives := "Lives: " + "  ".join(s.lives.map(func(a): return "A" + Style.SUIT_SYM[a.suit]))
 	_v.add_child(Style.label(lives, 26, Style.WHITE))
 
-	_pick_label = Style.label("Rik: välj en extra trea till startleken", 26, Style.GOLD)
+	_pick_label = Style.label("Rich: pick an extra three for your starting deck", 26, Style.GOLD)
 	_v.add_child(_pick_label)
 	_pick_row = HBoxContainer.new()
 	_pick_row.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -50,7 +50,7 @@ func enter() -> void:
 	var spacer := Control.new()
 	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_v.add_child(spacer)
-	_start = Style.button("Till striden!", Style.RED, 36)
+	_start = Style.button("To battle!", Style.RED, 36)
 	_start.custom_minimum_size.y = 96
 	_start.pressed.connect(func():
 		main.sfx.play("play")

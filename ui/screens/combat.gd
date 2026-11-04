@@ -6,6 +6,7 @@ const Style := preload("res://ui/style.gd")
 const CardView := preload("res://ui/card_view.gd")
 const GameState := preload("res://engine/game_state.gd")
 const Ev := preload("res://engine/events.gd")
+const Help := preload("res://ui/screens/help.gd")
 const Phase := GameState.Phase
 
 const HAND_CARD := Vector2(132, 185)
@@ -77,7 +78,11 @@ var _table_views: Dictionary = {}
 var _selected: Array = []
 var _retain_sel: Array = []
 var _main_btn: Button
-var _ace_btn: Button
+var _help_btn: Button
+var _tooltip: PanelContainer
+var _tooltip_label: Label
+var _lives_caption: Label
+var _mods_caption: Label
 var _draw_btn: Button
 var _disc_btn: Button
 var _menu_btn: Button
@@ -113,12 +118,24 @@ func _build() -> void:
 
 	_lives_box = HBoxContainer.new()
 	_lives_box.add_theme_constant_override("separation", 6)
+	_tappable(_lives_box, func(): main.open_overlay(Help.aces_overlay(main)))
 	add_child(_lives_box)
 	_info_box = HBoxContainer.new()
 	_info_box.add_theme_constant_override("separation", 6)
+	_tappable(_info_box, func(): main.open_overlay(Help.mods_overlay(main)))
 	add_child(_info_box)
-	_seed_label = Style.label("", 18, Style.MUTED, HORIZONTAL_ALIGNMENT_LEFT)
+	_lives_caption = Style.label("LIVES", 18, Style.MUTED, HORIZONTAL_ALIGNMENT_LEFT)
+	_lives_caption.autowrap_mode = TextServer.AUTOWRAP_OFF
+	add_child(_lives_caption)
+	_mods_caption = Style.label("MODS", 18, Style.MUTED, HORIZONTAL_ALIGNMENT_RIGHT)
+	_mods_caption.autowrap_mode = TextServer.AUTOWRAP_OFF
+	add_child(_mods_caption)
+	_seed_label = Style.label("", 18, Style.MUTED)
 	add_child(_seed_label)
+	_help_btn = Style.button("?", Style.BLUE, 34)
+	_help_btn.custom_minimum_size = Vector2(76, 56)
+	_help_btn.pressed.connect(func(): main.open_overlay(Help.rules_overlay(main)))
+	add_child(_help_btn)
 	_menu_btn = Style.button("≡", Style.BLACK, 34)
 	_menu_btn.custom_minimum_size = Vector2(76, 64)
 	_menu_btn.pressed.connect(_open_menu)
@@ -155,33 +172,54 @@ func _build() -> void:
 
 	_draw_btn = Style.button("", Style.BLACK, 22)
 	_draw_btn.custom_minimum_size = Vector2(110, 80)
-	_draw_btn.pressed.connect(func(): _show_pile("Dragbunt", _e.state.draw_pile))
+	_draw_btn.pressed.connect(func(): _show_pile("Draw pile", _e.state.draw_pile))
 	add_child(_draw_btn)
 	_disc_btn = Style.button("", Style.BLACK, 22)
 	_disc_btn.custom_minimum_size = Vector2(110, 80)
-	_disc_btn.pressed.connect(func(): _show_pile("Slänghög", _e.state.discard))
+	_disc_btn.pressed.connect(func(): _show_pile("Discard pile", _e.state.discard))
 	add_child(_disc_btn)
-	_ace_btn = Style.button("Offra ess", Color("7a2a8c"), 22)
-	_ace_btn.custom_minimum_size = Vector2(130, 80)
-	_ace_btn.pressed.connect(_ace_dialog)
-	add_child(_ace_btn)
-	_main_btn = Style.button("Klar", Style.RED, 34)
+	_main_btn = Style.button("Done", Style.RED, 34)
 	_main_btn.custom_minimum_size = Vector2(220, 92)
 	_main_btn.pressed.connect(_on_main)
 	add_child(_main_btn)
+
+	_tooltip = PanelContainer.new()
+	_tooltip.add_theme_stylebox_override("panel", Style.box(Color(0.06, 0.04, 0.1, 0.96), Style.GOLD, 3, 12))
+	_tooltip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_tooltip_label = Style.label("", 22, Style.WHITE, HORIZONTAL_ALIGNMENT_LEFT)
+	_tooltip_label.custom_minimum_size = Vector2(380, 0)
+	_tooltip.add_child(_tooltip_label)
+	_tooltip.visible = false
+	_tooltip.z_index = 50
+	add_child(_tooltip)
+
+
+## Makes a container react to taps (its card children ignore input).
+func _tappable(c: Control, fn: Callable) -> void:
+	c.mouse_filter = Control.MOUSE_FILTER_STOP
+	c.gui_input.connect(func(ev: InputEvent):
+		if ev is InputEventMouseButton and ev.button_index == MOUSE_BUTTON_LEFT and not ev.pressed and not main.is_busy():
+			main.sfx.play("select")
+			fn.call())
 
 
 func _layout() -> void:
 	var W := size.x
 	var H := size.y
 	_floor_strip.position = Vector2(16, 16)
-	_floor_strip.size = Vector2(W - 112, 44)
+	_floor_strip.size = Vector2(W - 200, 44)
+	_help_btn.position = Vector2(W - 176, 10)
+	_help_btn.size = Vector2(76, 56)
 	_menu_btn.position = Vector2(W - 88, 10)
 	_menu_btn.size = Vector2(76, 56)
 	_lives_box.position = Vector2(16, 74)
 	_info_box.position = Vector2(W - 16 - 2 * MINI.x - 6, 74)
-	_seed_label.position = Vector2(16, 74 + MINI.y + 2)
-	_seed_label.size = Vector2(300, 24)
+	_lives_caption.position = Vector2(18, 74 + MINI.y + 2)
+	_lives_caption.size = Vector2(200, 24)
+	_mods_caption.position = Vector2(W - 216, 74 + MINI.y + 2)
+	_mods_caption.size = Vector2(200, 24)
+	_seed_label.position = Vector2(0, 74 + MINI.y + 2)
+	_seed_label.size = Vector2(W, 24)
 	var ey := 190.0 + maxf(0.0, (H - 1280.0) * 0.25)
 	_enemy_layer.position = Vector2(0, ey)
 	_enemy_layer.size = Vector2(W, ENEMY_CARD.y)
@@ -203,7 +241,6 @@ func _layout() -> void:
 	_disc_btn.position = Vector2(W - 124, by)
 	_main_btn.position = Vector2(W / 2 - 40, by - 6)
 	_main_btn.size = Vector2(220, 92)
-	_ace_btn.position = Vector2(136, by)
 	var hy := by - HAND_CARD.y - 40
 	_hand_layer.position = Vector2(0, hy)
 	_hand_layer.size = Vector2(W, HAND_CARD.y)
@@ -321,7 +358,7 @@ func _sync_intents(cards: Array) -> void:
 		_intent_layer.add_child(ic)
 		_intent_layer.add_child(lab)
 	var s = _e.state
-	_left_label.text = ("Boss: %d kvar" if s.is_boss() else "%d kvar i fiendens hög") % s.enemy_pile.size()
+	_left_label.text = _left_text(s.enemy_pile.size() + s.current.size())
 
 
 func _sync_preview() -> void:
@@ -416,25 +453,67 @@ func _update_controls() -> void:
 		var c = s.find_in(s.hand, id)
 		if c == null:
 			continue
-		cv.dimmed = playing and not _e.can_play_card(c)
+		cv.dimmed = false
 		cv.set_selected((playing and _selected.has(id)) or (retaining and _retain_sel.has(id)))
-		cv.highlight = Style.GOLD if retaining and _retain_sel.has(id) else Color(0, 0, 0, 0)
-	_ace_btn.visible = playing and not _e.sacrificable_aces().is_empty()
+		if retaining and _retain_sel.has(id):
+			cv.highlight = Style.GOLD
+		elif playing and _e.is_effective(c):
+			cv.highlight = Color(Style.GREEN, 0.85)  # counts against the current enemy
+		else:
+			cv.highlight = Color(0, 0, 0, 0)
 	_main_btn.disabled = main.is_busy()
 	if playing:
-		_main_btn.text = "Spela" if not _selected.is_empty() else "Klar"
-		var none_playable: bool = _e.playable_cards().is_empty()
-		_hint_label.text = "Tryck på kort av rätt färg" if _selected.is_empty() and not none_playable else ""
-		if none_playable and s.played.is_empty():
-			_hint_label.text = "Inga kort av rätt färg"
+		_main_btn.text = "Play" if not _selected.is_empty() else "Done"
+		_hint_label.text = "Tap cards to play them – green ones count" if _selected.is_empty() else ""
 	elif retaining:
-		_main_btn.text = "Fortsätt"
-		_hint_label.text = "Spara %d kort (tryck)" % _e.retain_limit()
+		_main_btn.text = "Continue"
+		_hint_label.text = "Tap to keep %d card for next round" % _e.retain_limit()
 	else:
 		_hint_label.text = ""
-	_draw_btn.text = "Drag\n%d" % s.draw_pile.size()
-	_disc_btn.text = "Släng\n%d" % s.discard.size()
+	_draw_btn.text = "Draw\n%d" % s.draw_pile.size()
+	_disc_btn.text = "Discard\n%d" % s.discard.size()
 	_update_total()
+	_update_life_glow()
+	_update_tooltip()
+
+
+## Life aces glow when a sacrifice could help (you would miss the block or fail the shield).
+func _update_life_glow() -> void:
+	var s = _e.state
+	var usable: Array = _e.sacrificable_aces().map(func(a): return a.id)
+	var short := false
+	if s.phase == Phase.PLAY and not s.current.is_empty():
+		var t: Dictionary = _e.preview(_selected)
+		short = int(t["block"]) < int(t["block_need"]) or int(t["attack"]) < int(t["attack_need"])
+	for child in _lives_box.get_children():
+		var cv := child as CardView
+		if cv and cv.face_up:
+			cv.highlight = Color("b05cff") if short and usable.has(cv.card_id) else Color(0, 0, 0, 0)
+
+
+## Small explanation above the card when exactly one card is selected.
+func _update_tooltip() -> void:
+	var s = _e.state
+	var sel: Array = _selected if s.phase == Phase.PLAY else _retain_sel
+	if sel.size() != 1 or not _hand_views.has(sel[0]):
+		_tooltip.visible = false
+		return
+	var c = s.find_in(s.hand, sel[0])
+	if c == null:
+		_tooltip.visible = false
+		return
+	_tooltip_label.text = c.label() + ":  " + Help.card_effect(_e, c)
+	_tooltip.visible = true
+	_tooltip.reset_size()
+	var cv: CardView = _hand_views[sel[0]]
+	var w := _tooltip.size.x
+	var x := clampf(_hand_layer.position.x + cv.position.x + HAND_CARD.x / 2 - w / 2, 12, size.x - w - 12)
+	_tooltip.position = Vector2(x, _hand_layer.position.y - _tooltip.size.y - 56)
+	_hint_label.text = ""
+
+
+func _left_text(n: int) -> String:
+	return "%d enemy card%s left" % [n, "" if n == 1 else "s"]
 
 
 func _update_total() -> void:
@@ -442,7 +521,7 @@ func _update_total() -> void:
 	if s.phase != Phase.PLAY or s.current.is_empty():
 		_total_label.text = ""
 		_need_label.text = ""
-		_carry_label.text = ("Sparad sköld: %d" % s.carry_shield) if s.carry_shield > 0 else ""
+		_carry_label.text = ("Stored shield: %d" % s.carry_shield) if s.carry_shield > 0 else ""
 		return
 	var t: Dictionary = _e.preview(_selected)
 	var parts: Array = []
@@ -463,15 +542,17 @@ func _update_total() -> void:
 	_total_label.add_theme_font_size_override("font_size", 40 if parts.size() > 1 else 60)
 	_total_label.add_theme_color_override("font_color", Style.GREEN if ok else Style.WHITE)
 	if ok:
-		_need_label.text = "Exakt!" if exact else "Det räcker"
+		_need_label.text = "Exact!" if exact else "Enough"
 	else:
 		var miss := int(t["block_need"]) - int(t["block"])
 		if miss > 0:
 			var lives := 2 if miss >= int(s.balance["graded_threshold"]) else 1
-			_need_label.text = "Miss %d → -%d liv" % [miss, lives]
+			_need_label.text = "Miss %d → -%d %s" % [miss, lives, "life" if lives == 1 else "lives"]
 		else:
-			_need_label.text = "Skölden håller"
-	_carry_label.text = ("Sparad sköld +%d inräknad" % t["carry"]) if int(t["carry"]) > 0 else ""
+			_need_label.text = "The shield holds"
+	if int(t["block_need"]) == 0 and int(t["hearts"]) > 0:
+		_need_label.text += "  ·  ♥ stores %d shield" % int(t["hearts"])
+	_carry_label.text = ("Stored shield +%d included" % t["carry"]) if int(t["carry"]) > 0 else ""
 	if total != _last_total:
 		_last_total = total
 		_total_label.scale = Vector2(1.25, 1.25)
@@ -490,10 +571,6 @@ func _on_card_tapped(cv: CardView) -> void:
 	if c == null:
 		return
 	if s.phase == Phase.PLAY:
-		if not _e.can_play_card(c):
-			cv.pop(-0.1)
-			_hint_label.text = "Fel färg mot det här kortet"
-			return
 		if _selected.has(c.id):
 			_selected.erase(c.id)
 		else:
@@ -524,7 +601,7 @@ func _on_main() -> void:
 			var before: Array = s.hand.map(func(c): return c.id)
 			_e.play_cards(sel)
 			var fresh := false
-			for c in _e.playable_cards():
+			for c in s.hand:
 				if not before.has(c.id):
 					fresh = true
 			if not fresh:
@@ -535,22 +612,13 @@ func _on_main() -> void:
 		main.act(func(): _e.retain(keep))
 
 
-func _ace_dialog() -> void:
-	var choices: Array = []
-	for a in _e.sacrificable_aces():
-		var ace = a
-		choices.append(["Offra %s (−1 liv, +%d)" % [ace.label(), int(_e.state.balance["ace_value"])],
-			func(): main.act(func(): _e.sacrifice_ace(ace.id)), Color("7a2a8c")])
-	choices.append(["Avbryt", Callable(), Style.BLACK])
-	main.confirm("Offra ett livs-ess?\nDu förlorar livet, esset räknas som 14 den här rundan.", choices)
-
-
 func _open_menu() -> void:
-	var choices: Array = [["Händelselogg", func(): main.open_log(), Style.BLUE]]
+	var choices: Array = [["How to play", func(): main.open_overlay(Help.rules_overlay(main)), Style.BLUE],
+		["Event log", func(): main.open_log(), Style.BLUE]]
 	if main.debug_unlocked:
-		choices.append(["Debugmeny", func(): main.open_debug(), Color("7a2a8c")])
-	choices.append(["Avsluta omgången", func(): main.quit_to_menu(), Style.RED])
-	choices.append(["Tillbaka", Callable(), Style.BLACK])
+		choices.append(["Debug menu", func(): main.open_debug(), Color("7a2a8c")])
+	choices.append(["Quit run", func(): main.quit_to_menu(), Style.RED])
+	choices.append(["Back", Callable(), Style.BLACK])
 	main.confirm("Seed %d" % _e.state.seed_value, choices)
 
 
@@ -568,11 +636,11 @@ func _show_pile(title: String, cards: Array) -> void:
 		cv.setup(c, Vector2(100, 140))
 		grid.add_child(cv)
 	if cards.is_empty():
-		v.add_child(Style.label("Tom", 26, Style.MUTED))
+		v.add_child(Style.label("Empty", 26, Style.MUTED))
 	v.add_child(grid)
 	var p := Style.panel(v)
 	p.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	var close := Style.button("Stäng", Style.BLACK)
+	var close := Style.button("Close", Style.BLACK)
 	close.pressed.connect(p.queue_free)
 	v.add_child(close)
 	main.open_overlay(p)
@@ -589,7 +657,7 @@ func play_event(ev: Dictionary) -> float:
 			for id in _table_views.keys():
 				_table_views[id].queue_free()
 			_table_views.clear()
-			main.toast("Våning " + Style.floor_text(ev["floor"]) if ev["floor"] < 13 else "KUNGEN", Style.GOLD, 420)
+			main.toast("Floor " + Style.floor_text(ev["floor"]) if ev["floor"] < 13 else "THE KINGS", Style.GOLD, 420)
 			_reveal_fresh = true
 			return 0.7
 		Ev.JOKER_TRIGGERED:
@@ -615,7 +683,7 @@ func play_event(ev: Dictionary) -> float:
 				_layout_enemies()
 				cv.flip_to(true, 0.3)
 				_sync_intents(_enemy_views.keys().map(func(id): return _find_card(id)).filter(func(c): return c != null))
-				_left_label.text = ("Boss: %d kvar" if s.is_boss() else "%d kvar i fiendens hög") % ev["left"]
+				_left_label.text = _left_text(int(ev.get("total_left", ev["left"] + 1)))
 			main.sfx.play("flip")
 			return 0.35
 		Ev.HAND_FILLED:
@@ -675,13 +743,13 @@ func play_event(ev: Dictionary) -> float:
 			return 0.45
 		Ev.LIFE_RESTORED:
 			_sync_lives()
-			main.toast("+1 LIV", Style.RED, 300, 52)
+			main.toast("+1 LIFE", Style.RED, 300, 52)
 			main.sfx.play("reward")
 			return 0.5
 		Ev.BLOCKED:
 			if ev["exact"]:
 				main.flash(Color(1, 1, 1, 0.7), 0.35)
-				main.toast("PRECIS!", Style.GOLD, 600)
+				main.toast("EXACT!", Style.GOLD, 600)
 				main.sfx.play("exact")
 			else:
 				main.toast("BLOCK!", Style.BLUE, 600)
@@ -690,25 +758,25 @@ func play_event(ev: Dictionary) -> float:
 		Ev.DAMAGE_TAKEN:
 			main.shake(28.0 if ev["lives"] >= 2 else 16.0)
 			main.flash(Color(0.9, 0, 0, 0.45), 0.4)
-			main.toast("-%d LIV" % ev["lives"], Style.RED, 600)
+			main.toast("-%d %s" % [ev["lives"], "LIFE" if ev["lives"] == 1 else "LIVES"], Style.RED, 600)
 			main.sfx.play("hit")
 			return 0.6
 		Ev.SHIELD_STORED:
-			_carry_label.text = "Sparad sköld: %d" % ev["amount"]
+			_carry_label.text = "Stored shield: %d" % ev["amount"]
 			_carry_label.scale = Vector2(1.4, 1.4)
 			create_tween().tween_property(_carry_label, "scale", Vector2.ONE, 0.3)
 			return 0.25
 		Ev.ATTACK_SUCCEEDED:
 			if ev["exact"]:
 				main.flash(Color(1, 1, 1, 0.7), 0.35)
-				main.toast("PRECIS!", Style.GOLD, 600)
+				main.toast("EXACT!", Style.GOLD, 600)
 				main.sfx.play("exact")
 			else:
-				main.toast("KROSS!", Style.GOLD, 600)
+				main.toast("BREAK!", Style.GOLD, 600)
 			main.shake(8.0)
 			return 0.45
 		Ev.ATTACK_FAILED:
-			main.toast("Skölden håller", Style.BLUE, 600, 48)
+			main.toast("The shield holds", Style.BLUE, 600, 48)
 			for id in _enemy_views:
 				var cv: CardView = _enemy_views[id]
 				var c = _find_card(id)
@@ -720,7 +788,7 @@ func play_event(ev: Dictionary) -> float:
 			main.sfx.play("block", 0.7)
 			return 0.6
 		Ev.LOCKOUT:
-			main.toast("LÅST!", Style.RED, 520)
+			main.toast("LOCKED!", Style.RED, 520)
 			main.shake(20.0)
 			main.sfx.play("hit", 0.8)
 			return 0.8
@@ -748,16 +816,16 @@ func play_event(ev: Dictionary) -> float:
 					_hand_views.erase(id)
 			return 0.2
 		Ev.FLOOR_CLEARED:
-			main.toast("VÅNING KLAR!" if ev["floor"] < 13 else "KUNGEN FÄLLD!", Style.GOLD, 480)
+			main.toast("FLOOR CLEARED!" if ev["floor"] < 13 else "KINGS DEFEATED!", Style.GOLD, 480)
 			main.sfx.play("reward")
 			return 0.9
 		Ev.RUN_WON:
-			main.toast("SEGER!", Style.GOLD, 480, 96)
+			main.toast("VICTORY!", Style.GOLD, 480, 96)
 			main.burst(size / 2, Style.GOLD, 80)
 			main.sfx.play("win")
 			return 1.4
 		Ev.RUN_LOST:
-			main.toast("FÖRLUST", Style.RED, 480, 96)
+			main.toast("DEFEAT", Style.RED, 480, 96)
 			main.shake(30.0)
 			main.sfx.play("lose")
 			return 1.4

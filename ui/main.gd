@@ -69,6 +69,10 @@ func _ready() -> void:
 	_crt.material = crtm
 	_crt.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_crt)
+	# Hand cards use small z_index values for their fan order; keep effects and overlays above them.
+	_flash.z_index = 90
+	_overlay.z_index = 100
+	_crt.z_index = 110
 	sfx = Sfx.new()
 	add_child(sfx)
 	apply_settings()
@@ -300,6 +304,7 @@ func toast(text: String, color: Color = Style.GOLD, y: float = 520.0, size: int 
 	l.pivot_offset = l.size / 2
 	l.scale = Vector2(0.2, 0.2)
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	l.z_index = 95
 	add_child(l)
 	var tw := l.create_tween()
 	tw.tween_property(l, "scale", Vector2(1.15, 1.15), 0.18).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)

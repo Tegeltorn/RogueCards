@@ -15,7 +15,7 @@ const WHITE := Color("fffaf0")
 const MUTED := Color("b8a9c9")
 
 const SUIT_SYM := {"H": "♥", "D": "♦", "S": "♠", "C": "♣", "J": "★"}
-const SUIT_NAME := {"H": "Hjärter", "D": "Ruter", "S": "Spader", "C": "Klöver"}
+const SUIT_NAME := {"H": "Hearts", "D": "Diamonds", "S": "Spades", "C": "Clubs"}
 
 static var _theme: Theme
 static var _font: Font

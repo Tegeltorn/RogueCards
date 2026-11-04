@@ -3,6 +3,7 @@ extends Control
 
 const Style := preload("res://ui/style.gd")
 const CardView := preload("res://ui/card_view.gd")
+const Help := preload("res://ui/screens/help.gd")
 
 var main
 var _hold := 0.0
@@ -43,9 +44,9 @@ func enter() -> void:
 	_title.gui_input.connect(_on_title_input)
 	_title.pivot_offset = Vector2(300, 50)
 	v.add_child(_title)
-	v.add_child(Style.label("Ett roguelike-deckbuilder med en vanlig kortlek", 24, Style.MUTED))
+	v.add_child(Style.label("A roguelike deckbuilder with a standard deck of cards", 24, Style.MUTED))
 
-	var play := Style.button("Ny omgång", Style.RED, 38)
+	var play := Style.button("New run", Style.RED, 38)
 	play.custom_minimum_size.y = 96
 	play.pressed.connect(func(): main.sfx.play("select"); main.new_run())
 	v.add_child(play)
@@ -57,7 +58,7 @@ func enter() -> void:
 	_seed_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_seed_edit.custom_minimum_size.y = 76
 	h.add_child(_seed_edit)
-	var sb := Style.button("Spela seed", Style.BLUE, 26)
+	var sb := Style.button("Play seed", Style.BLUE, 26)
 	sb.pressed.connect(func():
 		var t := _seed_edit.text.strip_edges()
 		if t.is_valid_int():
@@ -65,7 +66,7 @@ func enter() -> void:
 	h.add_child(sb)
 	v.add_child(h)
 
-	var stats := Style.button("Statistik", Style.BLACK, 28)
+	var stats := Style.button("Stats", Style.BLACK, 28)
 	stats.pressed.connect(func(): main.open_stats())
 	v.add_child(stats)
 
@@ -73,7 +74,7 @@ func enter() -> void:
 	toggles.alignment = BoxContainer.ALIGNMENT_CENTER
 	for key in ["crt", "sound"]:
 		var cb := CheckBox.new()
-		cb.text = "CRT-filter" if key == "crt" else "Ljud"
+		cb.text = "CRT filter" if key == "crt" else "Sound"
 		cb.button_pressed = bool(main.settings.get(key, true))
 		cb.focus_mode = Control.FOCUS_NONE
 		cb.toggled.connect(func(on):
@@ -81,8 +82,17 @@ func enter() -> void:
 			main.apply_settings())
 		toggles.add_child(cb)
 	v.add_child(toggles)
-	var hint := Style.label("Håll inne titeln för debugmenyn", 18, Color(1, 1, 1, 0.35))
+	var hint := Style.label("Hold the title for the debug menu", 18, Color(1, 1, 1, 0.35))
 	v.add_child(hint)
+
+	var help := Style.button("?", Style.BLUE, 34)
+	help.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	help.offset_left = -92
+	help.offset_right = -16
+	help.offset_top = 16
+	help.offset_bottom = 72
+	help.pressed.connect(func(): main.open_overlay(Help.rules_overlay(main)))
+	add_child(help)
 
 
 func _process(delta: float) -> void:

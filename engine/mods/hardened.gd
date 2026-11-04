@@ -1,5 +1,5 @@
 extends "res://engine/mods/mod_base.gd"
-## ♥ Härdad: heart reward heals 2, ace sacrifice disabled.
+## ♥ Hardened: heart reward heals 2, ace sacrifice disabled.
 
 
 func modify_reward(reward: Dictionary) -> void:

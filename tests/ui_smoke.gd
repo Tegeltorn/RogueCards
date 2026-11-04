@@ -30,6 +30,8 @@ func _run() -> void:
 		main.new_run(100 + r)
 		await _wait(main)
 		var steps := 0
+		if r == 0:
+			await _overlays(main)
 		while main.engine.state.result == "" and steps < 400:
 			await _shot(main, main.screen_name + "_" + main.engine.state.phase_name())
 			main.act(func(): bot.step(main.engine))
@@ -70,3 +72,29 @@ func _shot(main, name: String) -> void:
 	var img := root.get_texture().get_image()
 	_shot_n += 1
 	img.save_png("%s/%02d_%s.png" % [_shots, _shot_n, name])
+
+
+## Opens the in-fight overlays and the one-card tooltip once (catches script errors, takes shots).
+func _overlays(main) -> void:
+	main.act(func(): main.engine.ack_reveal() if main.engine.state.phase == main.Phase.REVEAL else null)
+	await _wait(main)
+	if main.engine.state.phase == main.Phase.SETUP_PICK:
+		main.act(func(): main.engine.setup_pick(main.engine.state.setup_options[0].id))
+		await _wait(main)
+		main.act(func(): main.engine.ack_reveal())
+		await _wait(main)
+	var Help = load("res://ui/screens/help.gd")
+	var scr = main.screen
+	if main.screen_name == "combat" and not main.engine.state.hand.is_empty():
+		scr._selected = [main.engine.state.hand[0].id]
+		scr._update_controls()
+		await _shot(main, "combat_tooltip")
+		scr._selected = []
+		scr._update_controls()
+	for pair in [["rules", Help.rules_overlay(main)], ["aces", Help.aces_overlay(main)], ["mods", Help.mods_overlay(main)]]:
+		var p: Control = pair[1]
+		main.open_overlay(p)
+		await _shot(main, "overlay_" + pair[0])
+		p.queue_free()
+		await process_frame
+		await process_frame

@@ -1,26 +1,37 @@
 {
   "H": {
     "id": "hardened",
-    "name": "Härdad",
-    "desc": "Hjärterbelöningen läker 2 liv, men essoffer är avstängt.",
-    "params": { "heart_heal": 2 }
+    "name": "Hardened",
+    "desc": "The ♥ reward heals 2 lives, but ace sacrifice is disabled.",
+    "params": {
+      "heart_heal": 2
+    }
   },
   "D": {
     "id": "rich",
-    "name": "Rik",
-    "desc": "Välj en extra trea till startleken, men ruterbelöningen ger bara 1 kort.",
-    "params": { "extra_rank": 3, "diamond_picks": 1 }
+    "name": "Rich",
+    "desc": "Pick an extra three for your starting deck, but the ♦ reward gives only 1 card.",
+    "params": {
+      "extra_rank": 3,
+      "diamond_picks": 1
+    }
   },
   "S": {
     "id": "bloodthirst",
-    "name": "Blodtörst",
-    "desc": "Dina attacker får +1, men fiendens attacker får också +1.",
-    "params": { "player_attack_bonus": 1, "enemy_attack_bonus": 1 }
+    "name": "Bloodthirst",
+    "desc": "Your attacks get +1, but enemy attacks also get +1.",
+    "params": {
+      "player_attack_bonus": 1,
+      "enemy_attack_bonus": 1
+    }
   },
   "C": {
     "id": "foresight",
-    "name": "Förutseende",
-    "desc": "Du ser de två nästa fiendekorten, men du får inte spara kort.",
-    "params": { "preview": 2, "retain": 0 }
+    "name": "Foresight",
+    "desc": "You see the next two enemy cards, but you can't keep cards between rounds.",
+    "params": {
+      "preview": 2,
+      "retain": 0
+    }
   }
 }
