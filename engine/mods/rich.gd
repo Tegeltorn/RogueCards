@@ -1,9 +1,9 @@
 extends "res://engine/mods/mod_base.gd"
-## ♦ Rich: pick an extra three for the starting deck, but the diamond reward gives only 1 card.
+## ♦ Rich: keep two of the offered threes, but the diamond reward gives only 1 card.
 
 
-func setup_pick_rank() -> int:
-	return int(params.get("extra_rank", 3))
+func modify_start_picks(_n: int) -> int:
+	return int(params.get("start_picks", 2))
 
 
 func modify_reward(reward: Dictionary) -> void:

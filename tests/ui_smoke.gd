@@ -18,6 +18,10 @@ func _init() -> void:
 func _run() -> void:
 	var args := SimLib.parse_args(OS.get_cmdline_user_args())
 	var runs := int(args.get("runs", "3"))
+	# Watchdog: a script error can leave the loop waiting forever; fail instead of hanging.
+	create_timer(float(args.get("watchdog", "300")), true, false, true).timeout.connect(func():
+		push_error("UI smoke test timed out")
+		quit(1))
 	_shots = args.get("shots", "")
 	Engine.time_scale = float(args.get("speed", "8"))
 	var main = load("res://ui/main.tscn").instantiate()
@@ -116,4 +120,4 @@ func _reward_via_ui(main) -> void:
 		push_error("reward confirm disabled in " + s.phase_name())
 		main.act(func(): Bot.new().step(main.engine))
 		return
-	scr._on_confirm()
+	await scr._on_confirm()

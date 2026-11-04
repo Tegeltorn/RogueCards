@@ -99,18 +99,38 @@ func test_hardened() -> void:
 	eq(e.sacrificable_aces().size(), 0, "no ace sacrifice")
 
 
-func test_rich_setup() -> void:
+func test_start_pick() -> void:
+	var e := GameEngine.new()
+	e.start_run(5, Balance.make({"mods_enabled": false}), {})
+	eq(e.state.phase, Phase.SETUP_PICK, "start pick")
+	eq(e.state.setup_options.size(), 3, "three threes offered")
+	eq(e.state.setup_picks, 1, "keep one")
+	for c in e.state.setup_options:
+		eq(c.rank, 3, "offered cards are threes")
+	e.setup_pick(e.state.setup_options[1].id)
+	eq(e.state.phase, Phase.REVEAL, "done after one")
+	eq(e.state.deck.size(), 5, "four twos + a three")
+	e.ack_reveal()
+	eq(e.state.floor_num, 4, "the run starts on the fours")
+
+
+func test_rich_keeps_two() -> void:
 	var e := GameEngine.new()
 	e.start_run(5, Balance.make({}), {"force_mod": "D"})
-	eq(e.state.phase, Phase.SETUP_PICK, "setup pick")
-	var pick = e.state.setup_options[2]
-	e.setup_pick(pick.id)
-	eq(e.state.deck.size(), 5, "deck 5")
+	eq(e.state.setup_picks, 2, "Rich keeps two")
+	e.setup_pick(e.state.setup_options[0].id)
+	eq(e.state.phase, Phase.SETUP_PICK, "still picking")
+	e.setup_pick(e.state.setup_options[0].id)
+	eq(e.state.phase, Phase.REVEAL, "done")
+	eq(e.state.deck.size(), 6, "four twos + two threes")
+
+
+func test_spec_preset_starts_on_three() -> void:
+	var e := GameEngine.new()
+	e.start_run(5, Balance.make(Balance.load_json("res://config/presets/spec.json")), {"force_mod": "S"})
+	eq(e.state.phase, Phase.REVEAL, "no start pick in the spec rules")
 	e.ack_reveal()
-	var total: int = e.state.enemy_pile.size() + e.state.current.size()
-	eq(total, 3, "floor 3 has the other three")
-	for c in e.state.enemy_pile + e.state.current:
-		check(c.suit != pick.suit, "picked three not an enemy")
+	eq(e.state.floor_num, 3, "spec starts on the threes")
 
 
 func test_setup_lives_and_theme() -> void:
@@ -119,14 +139,16 @@ func test_setup_lives_and_theme() -> void:
 	eq(e.state.lives.size(), 3, "three lives")
 	for a in e.state.lives:
 		check(a.suit != e.state.mod_suit, "mod ace is not a life")
-	eq(e.state.deck.size(), 4, "four twos")
+	eq(e.state.deck.size(), 4, "four twos before the pick")
 
 
 func test_short_floors() -> void:
 	var e := GameEngine.new()
 	e.start_run(3, Balance.make({"mods_enabled": false}), {})
+	while e.state.phase == Phase.SETUP_PICK:
+		e.setup_pick(e.state.setup_options[0].id)
 	e.ack_reveal()
-	eq(e.state.enemy_pile.size() + e.state.current.size(), 3, "floor 3 short")
+	eq(e.state.enemy_pile.size() + e.state.current.size(), 3, "floor 4 short")
 	e._start_floor(6)
 	eq(e.state.enemy_pile.size() + e.state.current.size(), 4, "floor 6 full")
 

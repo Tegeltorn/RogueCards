@@ -29,6 +29,8 @@ var _opt_sel := -1   # selected reward option (card id)
 var _deck_sel := -1  # selected deck card (swap target, card to remove, or joker target)
 var _opt_views: Dictionary = {}
 var _deck_views: Dictionary = {}
+var _fresh_id := -1  # card that just landed in the deck (gets a pop + glow after refresh)
+var _animating := false
 
 
 func enter() -> void:
@@ -134,6 +136,15 @@ func refresh() -> void:
 		cv.tapped.connect(func(_x): _on_deck(c.id))
 		_deck.add_child(cv)
 		_deck_views[c.id] = cv
+		if c.id == _fresh_id:
+			cv.pop(0.2)
+			cv.highlight = Style.GREEN
+			var tw := cv.create_tween()
+			tw.tween_interval(0.8)
+			tw.tween_callback(func():
+				if is_instance_valid(cv):
+					cv.highlight = Color(0, 0, 0, 0))
+			_fresh_id = -1
 	_update_sel()
 
 
@@ -200,7 +211,7 @@ func _set_confirm(text: String, enabled: bool) -> void:
 
 
 func _on_option(id: int) -> void:
-	if main.is_busy():
+	if main.is_busy() or _animating:
 		return
 	_opt_sel = -1 if _opt_sel == id else id
 	main.sfx.play("select")
@@ -208,7 +219,7 @@ func _on_option(id: int) -> void:
 
 
 func _on_deck(id: int) -> void:
-	if main.is_busy() or not _deck_pickable():
+	if main.is_busy() or _animating or not _deck_pickable():
 		return
 	_deck_sel = -1 if _deck_sel == id else id
 	main.sfx.play("select")
@@ -216,25 +227,69 @@ func _on_deck(id: int) -> void:
 
 
 func _on_confirm() -> void:
-	if main.is_busy() or _confirm.disabled:
+	if main.is_busy() or _animating or _confirm.disabled:
 		return
+	_animating = true
 	var s = _e.state
 	var opt := _opt_sel
 	var dk := _deck_sel
 	_opt_sel = -1
 	_deck_sel = -1
+	_confirm.disabled = true
 	main.sfx.play("reward")
 	match s.phase:
 		Phase.REWARD:
-			main.act(func(): _e.reward_take(opt, dk if _e.deck_full() else -1))
+			var full: bool = _e.deck_full()
+			await _animate_take(opt, dk if full else -1)
+			_fresh_id = opt
+			main.act(func(): _e.reward_take(opt, dk if full else -1))
 		Phase.REWARD_REMOVE:
+			await _animate_out(dk)
 			main.act(func(): _e.reward_remove(dk))
 		Phase.JOKER_ATTACH:
+			_fresh_id = dk
+			if _deck_views.has(dk) and _opts.get_child_count() > 0:
+				var jv: Control = _opts.get_child(0)
+				jv.visible = false
+				await main.fly_card(null, jv.get_global_rect(), _deck_views[dk].get_global_rect().position, Vector2(110, 154)).finished
 			main.act(func(): _e.attach_joker(dk))
+	_animating = false
+
+
+## The picked reward card flies down into the deck (and a swapped-out card leaves first).
+func _animate_take(opt_id: int, out_id: int) -> void:
+	if out_id >= 0:
+		await _animate_out(out_id)
+	if not _opt_views.has(opt_id):
+		return
+	var src: CardView = _opt_views[opt_id]
+	var card = _e.state.find_in(_e.state.reward["options"], opt_id)
+	var target := _deck.get_global_rect().position
+	var kids := _deck.get_children().filter(func(k): return k.visible)
+	if not kids.is_empty():
+		var last: Rect2 = kids[-1].get_global_rect()
+		target = last.position + Vector2(120, 0)
+		if target.x + 110 > size.x:
+			target = Vector2(_deck.get_global_rect().position.x + 20, last.position.y + 164)
+	src.visible = false
+	await main.fly_card(card, src.get_global_rect(), target, Vector2(110, 154), 0.5).finished
+
+
+## A deck card leaves (swap or ♣ removal): pops, rises and fades.
+func _animate_out(id: int) -> void:
+	if not _deck_views.has(id):
+		return
+	var cv: CardView = _deck_views[id]
+	main.burst(cv.get_global_rect().get_center(), Style.MUTED, 18)
+	var tw := cv.create_tween()
+	tw.tween_property(cv, "scale", Vector2(1.15, 1.15), 0.08)
+	tw.tween_property(cv, "position:y", cv.position.y - 80, 0.3).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
+	tw.parallel().tween_property(cv, "modulate:a", 0.0, 0.3)
+	await tw.finished
 
 
 func _on_skip() -> void:
-	if main.is_busy():
+	if main.is_busy() or _animating:
 		return
 	var opt := _opt_sel
 	_opt_sel = -1

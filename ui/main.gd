@@ -295,6 +295,29 @@ func burst(pos: Vector2, color: Color, amount: int = 40) -> void:
 	get_tree().create_timer(1.2).timeout.connect(p.queue_free)
 
 
+## Animates a copy of `card` from one screen rect to another (e.g. a reward flying into the deck).
+## The copy frees itself; await the returned tween to wait for the landing.
+func fly_card(card, from: Rect2, to_pos: Vector2, to_size: Vector2, dur: float = 0.45) -> Tween:
+	var cv = load("res://ui/card_view.gd").new()
+	cv.set_interactive(false)
+	cv.breathing = false
+	if card == null:  # the red joker
+		cv.rank = 0
+		cv.suit = "J"
+	cv.setup(card, from.size)
+	cv.position = from.position
+	cv.z_index = 97
+	add_child(cv)
+	var sc := to_size.x / maxf(1.0, from.size.x)
+	var tw: Tween = cv.create_tween()
+	tw.tween_property(cv, "scale", Vector2(1.15, 1.15), 0.1).set_trans(Tween.TRANS_BACK)
+	tw.tween_property(cv, "position", to_pos - (from.size - to_size) / 2, dur).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
+	tw.parallel().tween_property(cv, "scale", Vector2(sc, sc), dur).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
+	tw.tween_callback(func(): sfx.play("draw"))
+	tw.tween_callback(cv.queue_free)
+	return tw
+
+
 ## Big popping text in the middle of the screen.
 func toast(text: String, color: Color = Style.GOLD, y: float = 520.0, size: int = 64) -> void:
 	var l := Style.label(text, size, color)

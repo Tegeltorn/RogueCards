@@ -1,11 +1,19 @@
 {
+  "first_floor": 3,
+  "start_pick_rank": 0,
+  "start_pick_offer": 3,
+  "start_pick_take": 1,
   "hand_size": 4,
   "boss_hand_size": 3,
   "retain": 1,
   "deck_cap": 5,
   "deck_min": 4,
   "lives": 3,
-  "short_floors": [3, 4, 5],
+  "short_floors": [
+    3,
+    4,
+    5
+  ],
   "graded_threshold": 5,
   "spade_multiplier": 1.5,
   "club_pair_bonus": 2,
@@ -20,6 +28,9 @@
   "heart_carry_mode": "next_round",
   "target": {
     "human_win_rate": 0.25,
-    "bot_win_rate_band": [0.15, 0.22]
+    "bot_win_rate_band": [
+      0.15,
+      0.22
+    ]
   }
 }

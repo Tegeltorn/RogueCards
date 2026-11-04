@@ -30,7 +30,7 @@ func scenario(hand: Array, enemies: Array, over: Dictionary = {}, opts: Dictiona
 		b[k] = over[k]
 	var e := GameEngine.new()
 	e.start_run(int(opts.get("seed", 1)), Balance.make(b), opts)
-	if e.state.phase == Phase.SETUP_PICK:
+	while e.state.phase == Phase.SETUP_PICK:
 		e.setup_pick(e.state.setup_options[0].id)
 	e.ack_reveal()
 	set_round(e, hand, enemies, opts.get("pile", []))

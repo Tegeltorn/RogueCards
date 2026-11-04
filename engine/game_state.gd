@@ -37,6 +37,7 @@ var round_num: int = 0
 var floor_round: int = 0
 
 var setup_options: Array = []
+var setup_picks: int = 0     # how many of setup_options may still be taken
 var reward: Dictionary = {}  # {suit, heal, picks, reveal, remove, options:[Card]}
 var red_joker_effect: String = ""
 var black_joker_effect: String = ""

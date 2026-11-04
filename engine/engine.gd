@@ -22,7 +22,7 @@ var state: GameState
 var rng: Rng
 var mod: ModBase
 var record_events := true  # the simulator turns this off for speed
-var _excluded: Dictionary = {}  # rank -> Array of suits removed from enemy floors (Rich mod)
+var _excluded: Dictionary = {}  # rank -> Array of suits taken by the start pick (removed from that floor)
 var _boss_pile: Array = []
 
 
@@ -82,15 +82,25 @@ func start_run(p_seed: int, balance: Dictionary = {}, options: Dictionary = {}) 
 		"red": jdata.get("red", {}).get("desc", ""), "black": jdata.get("black", {}).get("desc", ""),
 		"active": b["jokers_enabled"]})
 
-	state.floor_num = int(options.get("start_floor", GameState.FIRST_FLOOR))
-	var pick_rank := mod.setup_pick_rank()
-	if pick_rank > 0:
+	state.floor_num = int(options.get("start_floor", first_floor()))
+	# Start pick: reveal `start_pick_offer` random cards of `start_pick_rank` and keep some of them.
+	var pick_rank := int(b.get("start_pick_rank", 0))
+	var picks := mod.modify_start_picks(int(b.get("start_pick_take", 0)))
+	if pick_rank > 0 and picks > 0:
+		var pool: Array = []
 		for s in Card.SUITS:
-			state.setup_options.append(_new_card(pick_rank, s))
+			pool.append(_new_card(pick_rank, s))
+		rng.shuffle(pool)
+		state.setup_options = pool.slice(0, clampi(int(b.get("start_pick_offer", 4)), 1, 4))
+		state.setup_picks = mini(picks, state.setup_options.size())
 		state.phase = Phase.SETUP_PICK
-		_emit(Ev.SETUP_PICK, {"options": _labels(state.setup_options)})
+		_emit(Ev.SETUP_PICK, {"options": _labels(state.setup_options), "picks": state.setup_picks})
 	else:
 		state.phase = Phase.REVEAL
+
+
+func first_floor() -> int:
+	return clampi(int(state.balance.get("first_floor", GameState.FIRST_FLOOR)), 3, GameState.BOSS_FLOOR)
 
 
 func setup_pick(card_id: int) -> bool:
@@ -101,9 +111,12 @@ func setup_pick(card_id: int) -> bool:
 		return false
 	state.deck.append(c)
 	_excluded[c.rank] = _excluded.get(c.rank, []) + [c.suit]
-	state.setup_options.clear()
-	state.phase = Phase.REVEAL
-	_emit(Ev.SETUP_PICKED, {"card": c.label()})
+	state.setup_options.erase(c)
+	state.setup_picks -= 1
+	_emit(Ev.SETUP_PICKED, {"card": c.label(), "id": c.id})
+	if state.setup_picks <= 0 or state.setup_options.is_empty():
+		state.setup_options.clear()
+		state.phase = Phase.REVEAL
 	return true
 
 
@@ -686,7 +699,7 @@ func attach_joker(card_id: int) -> bool:
 func debug_jump_to_floor(f: int) -> void:
 	_emit(Ev.DEBUG, {"msg": "jumping to floor %d" % f})
 	state.reward = {}
-	_start_floor(clampi(f, GameState.FIRST_FLOOR, GameState.BOSS_FLOOR))
+	_start_floor(clampi(f, first_floor(), GameState.BOSS_FLOOR))
 
 
 func debug_give_life() -> void:

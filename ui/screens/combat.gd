@@ -40,14 +40,15 @@ class Icon:
 
 class FloorStrip:
 	extends Control
-	var current := 3
+	var current := 4
+	var first := 4
 	var font: Font
 
 	func _draw() -> void:
-		var n := 11
+		var n := 14 - first
 		var w := (size.x - (n - 1) * 6) / n
 		for i in n:
-			var f := 3 + i
+			var f := first + i
 			var r := Rect2(i * (w + 6), 0, w, size.y)
 			var bg := Style.PAPER if f == current else (Color(1, 1, 1, 0.12) if f < current else Color(0, 0, 0, 0.35))
 			draw_style_box(Style.box(bg, Style.INK if f == current else Color(1, 1, 1, 0.2), 3, 6), r)
@@ -102,6 +103,7 @@ func enter() -> void:
 		# Events (floor start, reveal, deal) are about to be animated; show only the static parts now.
 		var st = _e.state
 		_floor_strip.current = st.floor_num
+		_floor_strip.first = _e.first_floor()
 		_seed_label.text = "Seed %d" % st.seed_value
 		_sync_lives()
 		_sync_info()
@@ -286,6 +288,7 @@ func refresh() -> void:
 		return
 	var s = _e.state
 	_floor_strip.current = s.floor_num
+	_floor_strip.first = _e.first_floor()
 	_floor_strip.queue_redraw()
 	_seed_label.text = "Seed %d" % s.seed_value
 	_sync_lives()

@@ -3,14 +3,14 @@
 A solo game for a standard deck (52 cards + 2 jokers). You need nothing but the cards.
 
 ## Setup
-1. **Starting deck:** the four twos (2♥ 2♦ 2♠ 2♣), shuffled.
+1. **Starting deck:** the four twos (2♥ 2♦ 2♠ 2♣). Then shuffle the four threes, reveal `start_pick_offer` of them and add `start_pick_take` of your choice to your deck. The other threes are not used.
 2. **Mod ace:** shuffle the four aces and draw one. Its suit sets the run's mod (see below). Put `lives` of the other aces in front of you as your **lives**.
 3. **Theme king:** shuffle the four kings and draw one. Its suit decides the jokers.
 4. **Boss pile:** the other three kings plus the black joker. Put the red joker aside.
-5. **Enemies:** ranks 3 to Queen, one pile per rank. On the floors in `short_floors`, shuffle the pile and remove one card so that three are left.
+5. **Enemies:** ranks `first_floor` (4) to Queen, one pile per rank. On the floors in `short_floors`, shuffle the pile and remove one card so that three are left.
 
 ## Floors and rounds
-Play the floors in order: 3, 4 … 10, Jack, Queen and finally the kings. **At the start of each floor** shuffle your whole deck into a new draw pile. The discard pile is emptied, and kept cards and stored shield are reset.
+Play the floors in order: 4, 5 … 10, Jack, Queen and finally the kings. **At the start of each floor** shuffle your whole deck into a new draw pile. The discard pile is emptied, and kept cards and stored shield are reset.
 
 Each round:
 1. **Reveal** the top enemy card. Black = attack, red = shield. Its value is its rank.
@@ -60,7 +60,7 @@ Beat the whole boss pile to win.
 | Mod ace | Mod |
 |---|---|
 | ♥ Hardened | The ♥ reward heals 2 lives, but ace sacrifice is disabled. |
-| ♦ Rich | Pick an extra three for your starting deck. Floor 3 is then the other three threes. The ♦ reward gives only 1 card. |
+| ♦ Rich | Keep two of the offered threes instead of one. The ♦ reward gives only 1 card. |
 | ♠ Bloodthirst | Your attack gets +1, but every enemy attack also gets +1. |
 | ♣ Foresight | You see the next two enemy cards, but you can't keep cards between rounds. |
 
@@ -69,12 +69,15 @@ A test keeps these values in sync with `config/balance.json`.
 
 | Key | Value | Meaning |
 |---|---|---|
+| `first_floor` | 4 | First enemy floor |
+| `start_pick_offer` | 3 | Threes revealed at the start |
+| `start_pick_take` | 1 | Threes you keep |
 | `hand_size` | 4 | Hand size |
 | `boss_hand_size` | 3 | Hand size against the kings |
 | `retain` | 1 | Cards you may keep between rounds |
 | `deck_cap` | 9 | Max cards in your deck |
 | `deck_min` | 4 | Min cards in your deck |
 | `lives` | 3 | Number of life aces |
-| `short_floors` | [3,4,5] | Floors with only 3 enemies |
+| `short_floors` | [4,5] | Floors with only 3 enemies |
 | `graded_threshold` | 5 | Miss that costs 2 lives |
 | `club_pair_bonus` | 2 | Clubs bonus |

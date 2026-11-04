@@ -17,9 +17,9 @@ func setup(p_suit: String, data: Dictionary) -> void:
 	params = data.get("params", {})
 
 
-## Rank of an extra starting card the player picks before the run (0 = none).
-func setup_pick_rank() -> int:
-	return 0
+## How many of the offered start cards the player keeps.
+func modify_start_picks(n: int) -> int:
+	return n
 
 
 ## Total player attack for one round (called only when attack cards were played).

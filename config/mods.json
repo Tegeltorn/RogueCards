@@ -10,9 +10,9 @@
   "D": {
     "id": "rich",
     "name": "Rich",
-    "desc": "Pick an extra three for your starting deck, but the ♦ reward gives only 1 card.",
+    "desc": "Keep two of the three offered threes, but the ♦ reward gives only 1 card.",
     "params": {
-      "extra_rank": 3,
+      "start_picks": 2,
       "diamond_picks": 1
     }
   },

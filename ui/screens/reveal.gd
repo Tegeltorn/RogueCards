@@ -11,7 +11,9 @@ var main
 var _v: VBoxContainer
 var _pick_row: HBoxContainer
 var _start: Button
-var _pick_id := -1  # Rich mod: the three tapped so far (confirmed with the main button)
+var _pick_ids: Array = []  # start pick: threes tapped so far (confirmed with the main button)
+var _deck_row: HBoxContainer
+var _deck_label: Label
 var _pick_label: Label
 
 
@@ -42,7 +44,7 @@ func enter() -> void:
 	var lives := "Lives: " + "  ".join(s.lives.map(func(a): return "A" + Style.SUIT_SYM[a.suit]))
 	_v.add_child(Style.label(lives, 26, Style.WHITE))
 
-	_pick_label = Style.label("Rich: pick an extra three for your starting deck", 26, Style.GOLD)
+	_pick_label = Style.label("", 26, Style.GOLD)
 	_v.add_child(_pick_label)
 	_pick_row = HBoxContainer.new()
 	_pick_row.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -51,6 +53,12 @@ func enter() -> void:
 	pad.add_theme_constant_override("margin_top", 44)
 	pad.add_child(_pick_row)
 	_v.add_child(pad)
+	_deck_label = Style.label("Your deck", 22, Style.MUTED)
+	_v.add_child(_deck_label)
+	_deck_row = HBoxContainer.new()
+	_deck_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	_deck_row.add_theme_constant_override("separation", 8)
+	_v.add_child(_deck_row)
 
 	var spacer := Control.new()
 	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -67,6 +75,9 @@ func refresh() -> void:
 	var picking: bool = s.phase == Phase.SETUP_PICK
 	_pick_label.visible = picking
 	_pick_row.visible = picking
+	if picking:
+		_pick_label.text = "Pick a three for your starting deck" if s.setup_picks == 1 \
+			else "Rich: keep %d threes for your starting deck" % s.setup_picks
 	for c in _pick_row.get_children():
 		c.queue_free()
 	if picking:
@@ -77,12 +88,26 @@ func refresh() -> void:
 			cv.tapped.connect(func(_v2): _on_pick(card.id))
 			_pick_row.add_child(cv)
 			cv.land(0.8 + i * 0.08)
+	for c in _deck_row.get_children():
+		c.queue_free()
+	for c in s.deck:
+		var cv := CardView.new()
+		cv.set_interactive(false)
+		cv.breathing = false
+		cv.setup(c, Vector2(70, 98))
+		_deck_row.add_child(cv)
 	_update_pick()
 
 
 ## Tapping a three selects it (lifted + gold, like in a fight); the main button confirms.
 func _on_pick(id: int) -> void:
-	_pick_id = -1 if _pick_id == id else id
+	var picks: int = main.engine.state.setup_picks
+	if _pick_ids.has(id):
+		_pick_ids.erase(id)
+	else:
+		if _pick_ids.size() >= picks:
+			_pick_ids.pop_front()
+		_pick_ids.append(id)
 	main.sfx.play("select")
 	_update_pick()
 
@@ -96,22 +121,45 @@ func _update_pick() -> void:
 	for c in _pick_row.get_children():
 		var cv := c as CardView
 		if cv:
-			cv.set_selected(cv.card_id == _pick_id)
-			cv.highlight = Style.GOLD if cv.card_id == _pick_id else Color(0, 0, 0, 0)
-	var picked = s.find_in(s.setup_options, _pick_id)
-	_start.disabled = picked == null
-	_start.text = "Take %s" % picked.label() if picked != null else "Pick a three"
+			cv.set_selected(_pick_ids.has(cv.card_id))
+			cv.highlight = Style.GOLD if _pick_ids.has(cv.card_id) else Color(0, 0, 0, 0)
+	var labels: Array = []
+	for id in _pick_ids:
+		var c = s.find_in(s.setup_options, id)
+		if c != null:
+			labels.append(c.label())
+	var need: int = s.setup_picks
+	_start.disabled = labels.size() != need
+	if labels.size() == need:
+		_start.text = "Take " + " + ".join(labels)
+	else:
+		_start.text = "Pick a three" if need == 1 else "Pick %d threes" % need
 
 
 func _on_start() -> void:
 	var s = main.engine.state
+	if main.is_busy():
+		return
 	if s.phase == Phase.SETUP_PICK:
-		if _pick_id < 0:
+		if _start.disabled:
 			return
-		var id := _pick_id
-		_pick_id = -1
+		var ids := _pick_ids.duplicate()
+		_pick_ids.clear()
 		main.sfx.play("reward")
-		main.act(func(): main.engine.setup_pick(id))
+		# Fly the chosen threes into the deck row, then apply.
+		var kids := _deck_row.get_children()
+		var target: Vector2 = kids[-1].get_global_rect().position + Vector2(78, 0) if not kids.is_empty() else _deck_row.get_global_rect().get_center()
+		for i in ids.size():
+			for c in _pick_row.get_children():
+				var cv := c as CardView
+				if cv and cv.card_id == ids[i]:
+					cv.visible = false
+					main.fly_card(s.find_in(s.setup_options, ids[i]), cv.get_global_rect(), target + Vector2(i * 78, 0), Vector2(70, 98))
+		_start.disabled = true
+		await get_tree().create_timer(0.5).timeout
+		main.act(func():
+			for id in ids:
+				main.engine.setup_pick(id))
 		return
 	main.sfx.play("play")
 	main.act(func(): main.engine.ack_reveal())
