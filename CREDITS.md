@@ -10,7 +10,8 @@
 
 ## Graphics, shaders and sound
 Everything is made for this project:
-- Cards and suit symbols are drawn in code (`ui/card_view.gd`).
+- Cards and suit symbols are drawn in code (`ui/card_view.gd`). The app icon (`icon.png`) and the
+  loading-screen image (`assets/splash.png`) are rendered from that code by `tools/make_art.gd`.
 - The shaders are in `ui/fx/`. The drifting smoke is a flow-noise shader (`ui/fx/smoke.gdshader`).
 - The sounds are synthesized at runtime (`ui/sfx.gd`): plucked strings (Karplus-Strong), wooden knocks,
   parchment rustles, a frame drum and a hand bell.
