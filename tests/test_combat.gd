@@ -168,3 +168,17 @@ func test_retain_limit() -> void:
 	var keep = e.state.hand[1]
 	check(e.retain([keep.id]), "keep 1")
 	check(e.state.hand.has(keep), "kept card in new hand")
+
+
+func test_no_retain_when_floor_cleared() -> void:
+	var e := scenario(["5D", "4S"], ["3S"])
+	e.play_cards([e.state.hand[0].id])
+	e.resolve()
+	check(e.state.phase != Phase.RETAIN, "no keep step after the last enemy card")
+
+
+func test_lockout_risk() -> void:
+	var e := scenario(["2S"], ["9H"], {}, {"pile": ["6H"]})
+	check(e.lockout_risk(), "shield with only red cards left")
+	var f := scenario(["2S"], ["9H"], {}, {"pile": ["6S"]})
+	check(not f.lockout_risk(), "a black card is still in the pile")

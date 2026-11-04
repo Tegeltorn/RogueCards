@@ -69,28 +69,36 @@ static func _text(bb: String, size: int = 24) -> RichTextLabel:
 ## The "?" overlay: short rules with the current balance values.
 static func rules_overlay(main) -> Control:
 	var b: Dictionary = main.engine.state.balance if main.engine != null else main.balance()
-	var txt := """[color=#f4b942]GOAL[/color]  Beat floors 3 → Queen, then the three kings (and the black joker).
+	var H := "[color=#f4b942]%s[/color]"
+	var txt := """%s  An enemy card is revealed. [color=#e0383e]Black = attack[/color], [color=#3d8bfd]red = shield[/color]. Its value is its rank.
+• You draw up to %d cards.
+• Tap any cards and press Play. Only the right colour counts (green outline): red cards block attacks, black cards break shields.
+• Press Done to finish the round.
 
-[color=#f4b942]EACH ROUND[/color]  An enemy card is revealed. [color=#e0383e]Black = attack[/color], [color=#3d8bfd]red = shield[/color]. Its rank is its value.
-• Draw up to %d cards (%d against the kings).
-• Play any cards. Only the right colour counts: red cards block attacks, black cards break shields.
-• Attack: if your block is lower, you lose a life (a miss of %d or more costs 2). The card is beaten either way.
-• Shield: break it with enough attack, or it goes to the bottom of the enemy pile. Fail when no black enemy cards are left and you lose a life (locked).
-• Keep up to %d unplayed card(s) for the next round.
-
-[color=#f4b942]SUITS[/color]
+%s
 ♥ Block. Leftover block is stored as shield for the next round (with no attack: the full value).
 ♦ Block and draw 1 card (also against a shield).
 ♠ Attack × %s (rounded down).
 ♣ Attack. +%d if you play 2 or more clubs.
+Tip: select a single card to see what it does.
 
-[color=#f4b942]LIVES[/color]  Your aces. Tap them to see them or to sacrifice one (it counts as %d for one round).
+%s  If your block is too low you lose a life (a miss of %d or more costs 2). The attack card is beaten either way.
+%s  Break it with enough attack, or it goes to the bottom of the enemy pile and comes back.
+%s  Your aces at the bottom. Tap them to see them, or to sacrifice one: you lose that life and it counts as %d this round.
+%s  Keep up to %d unplayed card(s) for the next round.
 
-[color=#f4b942]REWARDS[/color]  The suit of the last beaten card decides: ♠ pick any beaten card · ♣ reveal 2, take 1, remove 1 · ♥ heal a life · ♦ reveal 2, take both. Your deck holds up to %d cards.
-
-[color=#f4b942]KINGS[/color]  Tap the king to see your mod and the jokers.""" % [
-		int(b["hand_size"]), int(b["boss_hand_size"]), int(b["graded_threshold"]), int(b["retain"]),
-		str(b["spade_multiplier"]), int(b["club_pair_bonus"]), int(b["ace_value"]), int(b["deck_cap"])]
+%s  A shield with no black enemy cards left behind it is a last stand: fail to break it and you lose a life.
+%s  The suit of the last beaten card decides: ♠ pick any beaten card · ♣ reveal 2, take 1, remove 1 · ♥ heal a life · ♦ reveal 2, take both. Your deck holds up to %d cards; when it is full you swap or decline.
+%s  Floors go 3 to Queen, then the three kings (%d cards in hand). Tap the king at the top to see your mod and the jokers (the red joker arrives after the Jack floor).""" % [
+		H % "EACH ROUND", int(b["hand_size"]),
+		H % "SUITS", str(b["spade_multiplier"]), int(b["club_pair_bonus"]),
+		H % "ATTACK", int(b["graded_threshold"]),
+		H % "SHIELD",
+		H % "LIVES", int(b["ace_value"]),
+		H % "KEEP", int(b["retain"]),
+		H % "LAST STAND",
+		H % "REWARDS", int(b["deck_cap"]),
+		H % "THE ROAD", int(b["boss_hand_size"])]
 	var v := VBoxContainer.new()
 	var scroll := ScrollContainer.new()
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED

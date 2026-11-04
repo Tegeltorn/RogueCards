@@ -26,6 +26,9 @@ static func font() -> Font:
 		var f: FontFile = load("res://assets/fonts/Jersey10.ttf")
 		var sym: FontFile = load("res://assets/fonts/SuitSymbols.ttf")
 		f.fallbacks = [sym]
+		# No system fonts on the web: turn system fallback off so desktop runs show missing glyphs too.
+		f.allow_system_fallback = false
+		sym.allow_system_fallback = false
 		# Ligatures off: pixel fonts can draw "fi" as a single odd glyph.
 		var fv := FontVariation.new()
 		fv.base_font = f

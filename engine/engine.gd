@@ -272,6 +272,17 @@ func playable_cards() -> Array:
 	return out
 
 
+## True when a shield is revealed and no black enemy cards are left in the pile:
+## failing to break it costs a life (the "locked" rule).
+func lockout_risk() -> bool:
+	if attack_need() <= 0:
+		return false
+	for e in state.enemy_pile:
+		if e.base_black():
+			return false
+	return true
+
+
 func retain_limit() -> int:
 	return mod.modify_retain(int(state.balance["retain"]))
 
@@ -476,7 +487,8 @@ func resolve() -> bool:
 	state.played = []
 	state.current = []
 	state.phase = Phase.RETAIN
-	if retain_limit() <= 0 or state.hand.is_empty():
+	# Nothing to keep when the floor is over (piles reset at the next floor).
+	if retain_limit() <= 0 or state.hand.is_empty() or state.enemy_pile.is_empty():
 		retain([])
 	return true
 

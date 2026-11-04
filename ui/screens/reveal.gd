@@ -11,6 +11,7 @@ var main
 var _v: VBoxContainer
 var _pick_row: HBoxContainer
 var _start: Button
+var _pick_id := -1  # Rich mod: the three tapped so far (confirmed with the main button)
 var _pick_label: Label
 
 
@@ -45,16 +46,18 @@ func enter() -> void:
 	_v.add_child(_pick_label)
 	_pick_row = HBoxContainer.new()
 	_pick_row.alignment = BoxContainer.ALIGNMENT_CENTER
-	_v.add_child(_pick_row)
+	# Room above the cards so the selected (lifted) card doesn't cover the caption.
+	var pad := MarginContainer.new()
+	pad.add_theme_constant_override("margin_top", 44)
+	pad.add_child(_pick_row)
+	_v.add_child(pad)
 
 	var spacer := Control.new()
 	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_v.add_child(spacer)
 	_start = Style.button("To battle!", Style.RED, 36)
 	_start.custom_minimum_size.y = 96
-	_start.pressed.connect(func():
-		main.sfx.play("play")
-		main.act(func(): main.engine.ack_reveal()))
+	_start.pressed.connect(_on_start)
 	_v.add_child(_start)
 	refresh()
 
@@ -64,7 +67,6 @@ func refresh() -> void:
 	var picking: bool = s.phase == Phase.SETUP_PICK
 	_pick_label.visible = picking
 	_pick_row.visible = picking
-	_start.disabled = picking
 	for c in _pick_row.get_children():
 		c.queue_free()
 	if picking:
@@ -72,11 +74,47 @@ func refresh() -> void:
 			var card = s.setup_options[i]
 			var cv := CardView.new()
 			cv.setup(card, Vector2(120, 168))
-			cv.tapped.connect(func(_v2):
-				main.sfx.play("reward")
-				main.act(func(): main.engine.setup_pick(card.id)))
+			cv.tapped.connect(func(_v2): _on_pick(card.id))
 			_pick_row.add_child(cv)
 			cv.land(0.8 + i * 0.08)
+	_update_pick()
+
+
+## Tapping a three selects it (lifted + gold, like in a fight); the main button confirms.
+func _on_pick(id: int) -> void:
+	_pick_id = -1 if _pick_id == id else id
+	main.sfx.play("select")
+	_update_pick()
+
+
+func _update_pick() -> void:
+	var s = main.engine.state
+	if s.phase != Phase.SETUP_PICK:
+		_start.text = "To battle!"
+		_start.disabled = false
+		return
+	for c in _pick_row.get_children():
+		var cv := c as CardView
+		if cv:
+			cv.set_selected(cv.card_id == _pick_id)
+			cv.highlight = Style.GOLD if cv.card_id == _pick_id else Color(0, 0, 0, 0)
+	var picked = s.find_in(s.setup_options, _pick_id)
+	_start.disabled = picked == null
+	_start.text = "Take %s" % picked.label() if picked != null else "Pick a three"
+
+
+func _on_start() -> void:
+	var s = main.engine.state
+	if s.phase == Phase.SETUP_PICK:
+		if _pick_id < 0:
+			return
+		var id := _pick_id
+		_pick_id = -1
+		main.sfx.play("reward")
+		main.act(func(): main.engine.setup_pick(id))
+		return
+	main.sfx.play("play")
+	main.act(func(): main.engine.ack_reveal())
 
 
 func _reveal_block(card, title: String, name: String, desc: String, delay: float) -> Control:

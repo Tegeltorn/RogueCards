@@ -19,7 +19,7 @@ func build(main) -> Control:
 	for f in range(3, 14):
 		var n := int(d["loss_floor"].get(str(f), 0))
 		if n > 0:
-			lines.append("  %s: %d  %s" % [Style.floor_text(f), n, "█".repeat(mini(n, 30))])
+			lines.append("  %s: %d  %s" % [Style.floor_text(f), n, "|".repeat(mini(n, 30))])
 	for pair in [["theme", "Per theme king"], ["mod", "Per mod ace"]]:
 		lines.append("")
 		lines.append("[b]%s[/b]" % pair[1])

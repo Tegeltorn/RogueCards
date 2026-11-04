@@ -82,7 +82,7 @@ func refresh() -> void:
 		Phase.REWARD:
 			var r: Dictionary = s.reward
 			var suit: String = r.get("suit", "S")
-			_sub.text = "Last card %s → %s" % [Style.SUIT_SYM[suit], RULE_TEXT[suit]]
+			_sub.text = "Last card %s: %s" % [Style.SUIT_SYM[suit], RULE_TEXT[suit]]
 			var healed: int = int(_last_offer().get("healed", 0))
 			if healed > 0:
 				_sub.text += "\nYou got %d life back!" % healed

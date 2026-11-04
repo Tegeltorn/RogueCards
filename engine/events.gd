@@ -69,7 +69,7 @@ static func describe(e: Dictionary) -> String:
 		SHIELD_STORED: return "Stored shield: %d" % e.get("amount", 0)
 		ATTACK_SUCCEEDED: return "Attack %d vs shield %d: broken" % [e.get("attack", 0), e.get("shield", 0)]
 		ATTACK_FAILED: return "Attack %d vs shield %d: goes to the bottom" % [e.get("attack", 0), e.get("shield", 0)]
-		LOCKOUT: return "Locked! No black cards left: -1 life, the shield counts as beaten"
+		LOCKOUT: return "Last stand! The shield held with no attackers left: -1 life, the shield counts as beaten"
 		ENEMY_DEFEATED: return "Defeated %s" % e.get("card", "")
 		LIFE_LOST: return "Lost a life (%s), %d left" % [e.get("card", ""), e.get("lives", 0)]
 		LIFE_RESTORED: return "Life restored (%s), %d lives" % [e.get("card", ""), e.get("lives", 0)]

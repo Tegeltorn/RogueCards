@@ -18,7 +18,7 @@ Each round:
 3. **Play** any cards you like. Only the right colour counts against the enemy: red cards block attacks, black cards break shields. Cards of the wrong colour still trigger their own effects (♦ draws, ♥ stores shield).
    - **Attack:** if your block is enough you are safe, otherwise you take damage. The enemy card is beaten either way.
    - **Shield:** if your attack is enough the shield is beaten. Otherwise it goes to the bottom of the enemy pile.
-   - **Locked:** if you fail against a shield and there are no black cards left in the enemy pile, lose 1 life and the shield counts as beaten.
+   - **Last stand:** if you fail against a shield and there are no black cards left in the enemy pile, lose 1 life and the shield counts as beaten.
 4. **Keep** up to `retain` unplayed cards. The rest of your hand and every played card go to the discard pile.
 
 | Suit | Effect |

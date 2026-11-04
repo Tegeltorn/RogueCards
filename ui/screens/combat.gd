@@ -67,7 +67,7 @@ var _enemy_views: Dictionary = {}  # id -> CardView
 var _intent_layer: Control
 var _left_label: Label
 var _preview_box: HBoxContainer
-var _total_label: Label
+var _total_label: RichTextLabel
 var _need_label: Label
 var _carry_label: Label
 var _hint_label: Label
@@ -82,6 +82,8 @@ var _help_btn: Button
 var _tooltip: PanelContainer
 var _tooltip_label: Label
 var _lives_caption: Label
+var _showdown: PanelContainer
+var _showdown_label: RichTextLabel
 var _mods_caption: Label
 var _draw_btn: Button
 var _disc_btn: Button
@@ -136,8 +138,8 @@ func _build() -> void:
 	_help_btn.custom_minimum_size = Vector2(76, 56)
 	_help_btn.pressed.connect(func(): main.open_overlay(Help.rules_overlay(main)))
 	add_child(_help_btn)
-	_menu_btn = Style.button("≡", Style.BLACK, 34)
-	_menu_btn.custom_minimum_size = Vector2(76, 64)
+	_menu_btn = Style.button("MENU", Style.BLACK, 24)
+	_menu_btn.custom_minimum_size = Vector2(100, 56)
 	_menu_btn.pressed.connect(_open_menu)
 	add_child(_menu_btn)
 
@@ -153,9 +155,28 @@ func _build() -> void:
 	_preview_box.add_theme_constant_override("separation", 6)
 	add_child(_preview_box)
 
-	_total_label = Style.label("", 64, Style.WHITE)
+	_total_label = RichTextLabel.new()
+	_total_label.bbcode_enabled = true
+	_total_label.scroll_active = false
+	_total_label.autowrap_mode = TextServer.AUTOWRAP_OFF
+	_total_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_total_label.add_theme_constant_override("outline_size", 12)
+	_total_label.add_theme_color_override("font_outline_color", Style.INK)
+	_total_label.add_theme_font_size_override("normal_font_size", 60)
 	add_child(_total_label)
+	_showdown = PanelContainer.new()
+	_showdown.add_theme_stylebox_override("panel", Style.box(Color(0.55, 0.05, 0.12, 0.95), Style.GOLD, 4, 10))
+	_showdown.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_showdown_label = RichTextLabel.new()
+	_showdown_label.bbcode_enabled = true
+	_showdown_label.fit_content = true
+	_showdown_label.scroll_active = false
+	_showdown_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_showdown_label.add_theme_font_size_override("normal_font_size", 22)
+	_showdown.add_child(_showdown_label)
+	_showdown.visible = false
+	_showdown.z_index = 20
+	add_child(_showdown)
 	_need_label = Style.label("", 24, Style.MUTED)
 	add_child(_need_label)
 	_carry_label = Style.label("", 22, Style.BLUE)
@@ -207,19 +228,18 @@ func _layout() -> void:
 	var W := size.x
 	var H := size.y
 	_floor_strip.position = Vector2(16, 16)
-	_floor_strip.size = Vector2(W - 200, 44)
-	_help_btn.position = Vector2(W - 176, 10)
+	_floor_strip.size = Vector2(W - 224, 44)
+	_help_btn.position = Vector2(W - 200, 10)
 	_help_btn.size = Vector2(76, 56)
-	_menu_btn.position = Vector2(W - 88, 10)
-	_menu_btn.size = Vector2(76, 56)
-	_lives_box.position = Vector2(16, 74)
+	_menu_btn.position = Vector2(W - 112, 10)
+	_menu_btn.size = Vector2(100, 56)
 	_info_box.position = Vector2(W - 16 - 2 * MINI.x - 6, 74)
-	_lives_caption.position = Vector2(18, 74 + MINI.y + 2)
-	_lives_caption.size = Vector2(200, 24)
+
 	_mods_caption.position = Vector2(W - 216, 74 + MINI.y + 2)
 	_mods_caption.size = Vector2(200, 24)
-	_seed_label.position = Vector2(0, 74 + MINI.y + 2)
-	_seed_label.size = Vector2(W, 24)
+	_seed_label.position = Vector2(18, 74)
+	_seed_label.size = Vector2(300, 24)
+	_seed_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	var ey := 190.0 + maxf(0.0, (H - 1280.0) * 0.25)
 	_enemy_layer.position = Vector2(0, ey)
 	_enemy_layer.size = Vector2(W, ENEMY_CARD.y)
@@ -232,11 +252,17 @@ func _layout() -> void:
 	_total_label.position = Vector2(0, ty)
 	_total_label.size = Vector2(W, 80)
 	_total_label.pivot_offset = Vector2(W / 2, 40)
+	_showdown.position = Vector2(W / 2 - 230, ey + ENEMY_CARD.y - 96)
+	_showdown.size = Vector2(460, 0)
 	_need_label.position = Vector2(0, ty + 72)
 	_need_label.size = Vector2(W, 30)
 	_carry_label.position = Vector2(0, ty + 100)
 	_carry_label.size = Vector2(W, 28)
 	var by := H - 106
+	# Lives sit in the bottom bar between the draw pile and the main button.
+	_lives_box.position = Vector2(132, by + 2)
+	_lives_caption.position = Vector2(132, by - 22)
+	_lives_caption.size = Vector2(180, 22)
 	_draw_btn.position = Vector2(14, by)
 	_disc_btn.position = Vector2(W - 124, by)
 	_main_btn.position = Vector2(W / 2 - 40, by - 6)
@@ -518,18 +544,23 @@ func _left_text(n: int) -> String:
 
 func _update_total() -> void:
 	var s = _e.state
+	_update_showdown()
 	if s.phase != Phase.PLAY or s.current.is_empty():
 		_total_label.text = ""
 		_need_label.text = ""
-		_carry_label.text = ("Stored shield: %d" % s.carry_shield) if s.carry_shield > 0 else ""
+		_carry_label.text = ("Stored shield from ♥: %d" % s.carry_shield) if s.carry_shield > 0 else ""
 		return
+	_carry_label.text = ""
 	var t: Dictionary = _e.preview(_selected)
 	var parts: Array = []
 	var ok := true
 	var exact := false
 	var total := 0
 	if int(t["block_need"]) > 0:
-		parts.append("BLOCK %d / %d" % [t["block"], t["block_need"]])
+		var part := "BLOCK %d / %d" % [t["block"], t["block_need"]]
+		if int(t["carry"]) > 0:
+			part += " [font_size=26][color=#3d8bfd](+%d stored from [color=#e0383e]♥[/color])[/color][/font_size]" % int(t["carry"])
+		parts.append(part)
 		ok = ok and int(t["block"]) >= int(t["block_need"])
 		exact = int(t["block"]) == int(t["block_need"])
 		total += int(t["block"])
@@ -538,27 +569,52 @@ func _update_total() -> void:
 		ok = ok and int(t["attack"]) >= int(t["attack_need"])
 		exact = exact or int(t["attack"]) == int(t["attack_need"])
 		total += int(t["attack"])
-	_total_label.text = "  ".join(parts) if parts.size() > 1 else parts[0] if not parts.is_empty() else ""
-	_total_label.add_theme_font_size_override("font_size", 40 if parts.size() > 1 else 60)
-	_total_label.add_theme_color_override("font_color", Style.GREEN if ok else Style.WHITE)
+	var col := "#2ec27e" if ok else "#fffaf0"
+	var fs := 40 if parts.size() > 1 else 60
+	_total_label.text = "[center][font_size=%d][color=%s]%s[/color][/font_size][/center]" % [fs, col, "  ".join(parts)]
 	if ok:
 		_need_label.text = "Exact!" if exact else "Enough"
 	else:
 		var miss := int(t["block_need"]) - int(t["block"])
 		if miss > 0:
 			var lives := 2 if miss >= int(s.balance["graded_threshold"]) else 1
-			_need_label.text = "Miss %d → -%d %s" % [miss, lives, "life" if lives == 1 else "lives"]
+			_need_label.text = "Miss by %d: -%d %s" % [miss, lives, "life" if lives == 1 else "lives"]
+		elif _e.lockout_risk():
+			_need_label.text = "Not enough: -1 life"
 		else:
 			_need_label.text = "The shield holds"
 	if int(t["block_need"]) == 0 and int(t["hearts"]) > 0:
 		_need_label.text += "  ·  ♥ stores %d shield" % int(t["hearts"])
-	_carry_label.text = ("Stored shield +%d included" % t["carry"]) if int(t["carry"]) > 0 else ""
 	if total != _last_total:
 		_last_total = total
 		_total_label.scale = Vector2(1.25, 1.25)
 		create_tween().tween_property(_total_label, "scale", Vector2.ONE, 0.25).set_trans(Tween.TRANS_BACK)
 		if ok:
 			main.sfx.play("select", 1.4)
+
+
+const SHOWDOWN_FLAVOUR := [
+	"The enemy is cornered and fighting for its life.",
+	"No allies left. It is a desperate last stand.",
+	"Final showdown: it won't go down quietly.",
+	"Its back is against the wall, and it is getting desperate.",
+]
+
+
+## Red ribbon over the enemy when failing this shield would cost a life (no black enemy cards left).
+func _update_showdown() -> void:
+	var s = _e.state
+	var risk: bool = s.phase == Phase.PLAY and _e.lockout_risk()
+	if not risk:
+		_showdown.visible = false
+		return
+	var flavour: String = SHOWDOWN_FLAVOUR[int(s.current[0].id) % SHOWDOWN_FLAVOUR.size()]
+	_showdown_label.text = "[center][font_size=30][color=#f4b942]LAST STAND![/color][/font_size]\n%s\n[color=#ffd0d0]Fail to break this shield and you lose a life.[/color][/center]" % flavour
+	if not _showdown.visible:
+		_showdown.visible = true
+		_showdown.pivot_offset = Vector2(230, 50)
+		_showdown.scale = Vector2(0.6, 0.6)
+		create_tween().tween_property(_showdown, "scale", Vector2.ONE, 0.3).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 
 # ---------------------------------------------------------------- input
@@ -762,9 +818,7 @@ func play_event(ev: Dictionary) -> float:
 			main.sfx.play("hit")
 			return 0.6
 		Ev.SHIELD_STORED:
-			_carry_label.text = "Stored shield: %d" % ev["amount"]
-			_carry_label.scale = Vector2(1.4, 1.4)
-			create_tween().tween_property(_carry_label, "scale", Vector2.ONE, 0.3)
+			main.toast("+%d SHIELD STORED" % ev["amount"], Style.BLUE, 680, 40)
 			return 0.25
 		Ev.ATTACK_SUCCEEDED:
 			if ev["exact"]:
@@ -788,7 +842,7 @@ func play_event(ev: Dictionary) -> float:
 			main.sfx.play("block", 0.7)
 			return 0.6
 		Ev.LOCKOUT:
-			main.toast("LOCKED!", Style.RED, 520)
+			main.toast("LAST STAND!", Style.RED, 520)
 			main.shake(20.0)
 			main.sfx.play("hit", 0.8)
 			return 0.8
