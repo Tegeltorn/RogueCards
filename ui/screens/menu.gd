@@ -74,10 +74,10 @@ func enter() -> void:
 	var toggles := HFlowContainer.new()
 	toggles.alignment = FlowContainer.ALIGNMENT_CENTER
 	toggles.add_theme_constant_override("h_separation", 10)
-	for key in ["night", "crt", "sound"]:
+	for key in ["night", "crt", "sound", "vibration"]:
 		var cb := CheckBox.new()
-		cb.text = {"night": "Night", "crt": "Vignette", "sound": "Sound"}[key]
-		cb.button_pressed = bool(main.settings.get(key, key == "crt" or key == "sound"))
+		cb.text = {"night": "Night", "crt": "Vignette", "sound": "Sound", "vibration": "Vibration"}[key]
+		cb.button_pressed = bool(main.settings.get(key, key != "night"))
 		cb.focus_mode = Control.FOCUS_NONE
 		cb.toggled.connect(func(on):
 			main.settings[key] = on
