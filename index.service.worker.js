@@ -4,7 +4,7 @@
 // Incrementing CACHE_VERSION will kick off the install event and force
 // previously cached resources to be updated from the network.
 /** @type {string} */
-const CACHE_VERSION = '1793823311|2293246';
+const CACHE_VERSION = '1793824114|3333488';
 /** @type {string} */
 const CACHE_PREFIX = 'RogueCards-sw-cache-';
 const CACHE_NAME = CACHE_PREFIX + CACHE_VERSION;
