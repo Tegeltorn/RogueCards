@@ -96,7 +96,6 @@ func _process(delta: float) -> void:
 func apply_settings() -> void:
 	_crt.visible = bool(settings.get("crt", true))
 	sfx.enabled = bool(settings.get("sound", true))
-	_smoke.set_simulated(not bool(settings.get("smoke_simple", false)))
 	_apply_palette()
 	Store.save_settings(settings)
 
@@ -117,9 +116,9 @@ func _apply_palette() -> void:
 	crtm.set_shader_parameter("tint", Color(0, 0, 0) if Style.night else Color(0.25, 0.14, 0.06))
 	crtm.set_shader_parameter("vignette", 0.4 if Style.night else 0.22)
 	if Style.night:
-		_smoke.set_colors(Color("eee6da"), Color(0, 0, 0), 0.26)
+		_smoke.set_colors(Color("eee6da"), Color(0, 0, 0), 0.2)
 	else:
-		_smoke.set_colors(Color("fffaf0"), Color("6b4a2e"), 0.75)
+		_smoke.set_colors(Color("fffaf0"), Color("6b4a2e"), 0.55)
 	if changed and screen != null:
 		# Screens bake colours in when built, so rebuild the visible one.
 		var n := screen_name
@@ -319,7 +318,6 @@ func flash(color: Color = Color(1, 1, 1, 0.6), dur: float = 0.25) -> void:
 
 
 func burst(pos: Vector2, color: Color, amount: int = 40) -> void:
-	_smoke.puff(pos, clampf(amount / 40.0, 0.4, 1.5))
 	var p := CPUParticles2D.new()
 	p.position = pos
 	p.amount = amount
