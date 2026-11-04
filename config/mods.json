@@ -28,10 +28,9 @@
   "C": {
     "id": "foresight",
     "name": "Foresight",
-    "desc": "You see the next two enemy cards, but you can't keep cards between rounds.",
+    "desc": "You see the next enemy card.",
     "params": {
-      "preview": 2,
-      "retain": 0
+      "preview": 1
     }
   }
 }

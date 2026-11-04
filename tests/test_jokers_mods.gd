@@ -69,7 +69,7 @@ func test_boss_hand_size() -> void:
 	var e := scenario([], ["4S"])
 	e.state.deck = cards(e, ["2H", "2D", "2S", "2C", "5C"])
 	e._start_floor(13)
-	eq(e.state.hand.size(), 3, "boss hand 3")
+	eq(e.state.hand.size(), 2, "boss hand 2")
 
 
 func test_win_after_boss() -> void:
@@ -90,8 +90,8 @@ func test_bloodthirst() -> void:
 
 func test_foresight() -> void:
 	var e := scenario([], ["5S"], {"mods_enabled": true}, {"force_mod": "C", "pile": ["6S", "7H", "8S"]})
-	eq(e.retain_limit(), 0, "no retain")
-	eq(e.preview_enemies().size(), 2, "see two")
+	eq(e.preview_enemies().size(), 1, "see the next card")
+	eq(e.retain_limit(), 1, "no retain penalty")
 
 
 func test_hardened() -> void:

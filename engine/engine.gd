@@ -186,8 +186,10 @@ func _next_round() -> void:
 			"intent": "attack" if c.base_black() else "shield", "value": enemy_value(c),
 			"left": state.enemy_pile.size(), "total_left": state.enemy_pile.size() + state.current.size(),
 			"virtual": c.from_joker})
-	# Fill the hand.
-	state.hand = state.retained
+	# Fill the hand. With keep_hand, unplayed cards simply stay; otherwise only the retained ones.
+	state.overpowered = false
+	if not keep_hand():
+		state.hand = state.retained
 	state.retained = []
 	var limit := int(state.balance["boss_hand_size"] if state.is_boss() else state.balance["hand_size"])
 	while state.hand.size() < limit:
@@ -444,13 +446,15 @@ func play_cards(ids: Array) -> bool:
 	var draws := 0
 	# Overpower: black cards worth at least `overpower_multiplier` × the enemy attack (with no shield
 	# revealed) are discarded at once and you draw 1 card. The enemy still attacks at End turn.
-	var ov := overpower_value(cards)
+	# Counts every black card played against this attack so far; triggers once per round.
+	var ov := 0 if state.overpowered else overpower_value(state.played)
 	if ov > 0:
-		var blacks: Array = cards.filter(func(c): return c.is_black() and not c.is_red())
+		var blacks: Array = state.played.filter(func(c): return c.is_black() and not c.is_red())
 		for c in blacks:
 			state.played.erase(c)
 			if not c.temp:
 				state.discard.append(c)
+		state.overpowered = true
 		draws += int(state.balance.get("overpower_draw", 1))
 		_emit(Ev.OVERPOWER, {"attack": ov, "enemy": block_need(), "ids": _ids(blacks), "cards": _labels(blacks)})
 	for c in cards:
@@ -542,11 +546,20 @@ func resolve() -> bool:
 			state.discard.append(c)
 	state.played = []
 	state.current = []
+	if keep_hand():
+		# Unplayed cards stay in hand; draw back up to the hand size next round.
+		_next_round()
+		return true
 	state.phase = Phase.RETAIN
 	# Nothing to keep when the floor is over (piles reset at the next floor).
 	if retain_limit() <= 0 or state.hand.is_empty() or state.enemy_pile.is_empty():
 		retain([])
 	return true
+
+
+## True when unplayed cards stay in hand between rounds (no discard, no keep step).
+func keep_hand() -> bool:
+	return bool(state.balance.get("keep_hand", false))
 
 
 func retain(ids: Array) -> bool:

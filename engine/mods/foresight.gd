@@ -1,10 +1,6 @@
 extends "res://engine/mods/mod_base.gd"
-## ♣ Foresight: see the next two enemy cards, but retain = 0.
+## ♣ Foresight: see the next enemy card.
 
 
 func preview_count() -> int:
-	return int(params.get("preview", 2))
-
-
-func modify_retain(_n: int) -> int:
-	return int(params.get("retain", 0))
+	return int(params.get("preview", 1))

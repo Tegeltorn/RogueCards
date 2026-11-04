@@ -14,12 +14,12 @@ Play the floors in order: 4, 5 … 10, Jack, Queen and finally the kings. **At t
 
 Each round:
 1. **Reveal** the top enemy card. Black = attack, red = shield. Its value is its rank.
-2. **Fill your hand** up to `hand_size` cards (`boss_hand_size` against the kings). If the draw pile is empty, shuffle the discard pile into a new one.
+2. **Fill your hand** up to `hand_size` cards (`boss_hand_size` against the kings). Cards you didn't play last round are still in your hand. If the draw pile is empty, shuffle the discard pile into a new one.
 3. **Play** any cards you like. Only the right colour counts against the enemy: red cards block attacks, black cards break shields. Cards of the wrong colour still trigger their own effects (♦ draws, ♥ stores shield).
    - **Attack:** if your block is enough you are safe, otherwise you take damage. The enemy card is beaten either way.
    - **Shield:** if your attack is enough the shield is beaten. Otherwise it goes to the bottom of the enemy pile.
    - **Last stand:** if you fail against a shield and there are no black cards left in the enemy pile, lose 1 life and the shield counts as beaten.
-4. **End your turn:** the revealed enemy card is resolved as above. Then **keep** up to `retain` unplayed cards. The rest of your hand and every played card go to the discard pile.
+4. **End your turn:** the revealed enemy card is resolved as above. Every played card goes to the discard pile; unplayed cards stay in your hand (`keep_hand`). With `keep_hand` off, you instead keep up to `retain` unplayed cards and discard the rest.
 
 | Suit | Effect |
 |---|---|
@@ -28,7 +28,7 @@ Each round:
 | ♠ | Attack. Value × 1.5, rounded down (2→3, 3→4, 5→7 …). |
 | ♣ | Attack. +`club_pair_bonus` if you play at least two clubs in the same round. |
 
-Black cards played against an attack don't block. **Overpower:** if the black cards you play at once against an attack are worth at least `overpower_multiplier` × its value (♠ × 1.5 and the ♣ bonus count), discard them right away and draw `overpower_draw` card. The enemy still attacks when you end your turn.
+Black cards played against an attack don't block. **Overpower:** once per round, when the black cards you have played against an attack add up to at least `overpower_multiplier` × its value (♠ × 1.5 and the ♣ bonus count), discard them right away and draw `overpower_draw` card. The enemy still attacks when you end your turn.
 
 **Damage:** a miss of 1 to `graded_threshold` − 1 costs 1 life. A bigger miss costs 2 lives. Put lost aces aside. When you have no aces left, you lose.
 
@@ -62,7 +62,7 @@ Beat the whole boss pile to win.
 | ♥ Hardened | The ♥ reward heals 2 lives, but ace sacrifice is disabled. |
 | ♦ Rich | Keep two of the offered threes instead of one. The ♦ reward gives only 1 card. |
 | ♠ Bloodthirst | Your attack gets +1, but every enemy attack also gets +1. |
-| ♣ Foresight | You see the next two enemy cards, but you can't keep cards between rounds. |
+| ♣ Foresight | Keep the top card of the enemy pile face up: you always see the next enemy card. |
 
 ## Current balance values
 A test keeps these values in sync with `config/balance.json`.
@@ -72,9 +72,10 @@ A test keeps these values in sync with `config/balance.json`.
 | `first_floor` | 4 | First enemy floor |
 | `start_pick_offer` | 3 | Threes revealed at the start |
 | `start_pick_take` | 1 | Threes you keep |
-| `hand_size` | 4 | Hand size |
-| `boss_hand_size` | 3 | Hand size against the kings |
-| `retain` | 1 | Cards you may keep between rounds |
+| `hand_size` | 3 | Hand size |
+| `boss_hand_size` | 2 | Hand size against the kings |
+| `keep_hand` | true | Unplayed cards stay in hand between rounds |
+| `retain` | 1 | Cards you may keep (only when `keep_hand` is off) |
 | `deck_cap` | 9 | Max cards in your deck |
 | `deck_min` | 4 | Min cards in your deck |
 | `lives` | 3 | Number of life aces |

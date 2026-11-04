@@ -68,6 +68,7 @@ var _enemy_views: Dictionary = {}  # id -> CardView
 var _intent_layer: Control
 var _left_label: Label
 var _preview_box: HBoxContainer
+var _stack_layer: Control
 var _total_label: RichTextLabel
 var _need_label: Label
 var _carry_label: Label
@@ -79,7 +80,6 @@ var _table_views: Dictionary = {}
 var _selected: Array = []
 var _retain_sel: Array = []
 var _main_btn: Button
-var _play_btn: Button
 var _help_btn: Button
 var _tooltip: PanelContainer
 var _tooltip_label: Label
@@ -148,6 +148,9 @@ func _build() -> void:
 	_menu_btn.pressed.connect(_open_menu)
 	add_child(_menu_btn)
 
+	_stack_layer = Control.new()
+	_stack_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_stack_layer)
 	_enemy_layer = Control.new()
 	_enemy_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_enemy_layer)
@@ -217,12 +220,8 @@ func _build() -> void:
 	_disc_btn.custom_minimum_size = Vector2(110, 80)
 	_disc_btn.pressed.connect(func(): _show_pile("Discard pile", _e.state.discard))
 	add_child(_disc_btn)
-	_play_btn = Style.button("Play", Style.GREEN, 30)
-	_play_btn.custom_minimum_size = Vector2(124, 92)
-	_play_btn.pressed.connect(_on_play)
-	add_child(_play_btn)
-	_main_btn = Style.button("End turn", Style.RED, 26)
-	_main_btn.custom_minimum_size = Vector2(134, 92)
+	_main_btn = Style.button("End turn", Style.RED, 32)
+	_main_btn.custom_minimum_size = Vector2(200, 92)
 	_main_btn.pressed.connect(_on_main)
 	add_child(_main_btn)
 
@@ -265,6 +264,8 @@ func _layout() -> void:
 	var ey := 190.0 + maxf(0.0, (H - 1280.0) * 0.25)
 	_enemy_layer.position = Vector2(0, ey)
 	_enemy_layer.size = Vector2(W, ENEMY_CARD.y)
+	_stack_layer.position = Vector2(0, ey)
+	_stack_layer.size = Vector2(W, ENEMY_CARD.y)
 	_intent_layer.position = Vector2(0, ey)
 	_intent_layer.size = Vector2(W, ENEMY_CARD.y)
 	_left_label.position = Vector2(0, ey + ENEMY_CARD.y + 8)
@@ -289,10 +290,8 @@ func _layout() -> void:
 	_draw_btn.position = Vector2(14, by)
 	_disc_btn.position = Vector2(W - 124, by)
 	# Bottom bar: Draw | lives | Play | End turn | Discard
-	_play_btn.position = Vector2(W - 124 - 8 - 134 - 6 - 124, by - 6)
-	_play_btn.size = Vector2(124, 92)
-	_main_btn.position = Vector2(W - 124 - 8 - 134, by - 6)
-	_main_btn.size = Vector2(134, 92)
+	_main_btn.position = Vector2(326, by - 6)
+	_main_btn.size = Vector2(W - 124 - 8 - 326, 92)
 	var hy := by - HAND_CARD.y - 40
 	_hand_layer.position = Vector2(0, hy)
 	_hand_layer.size = Vector2(W, HAND_CARD.y)
@@ -414,11 +413,35 @@ func _sync_intents(cards: Array) -> void:
 	_left_label.text = _left_text(s.enemy_pile.size() + s.current.size())
 
 
+## Foresight: the next enemy card, face up, labelled NEXT.
 func _sync_preview() -> void:
 	for c in _preview_box.get_children():
 		c.queue_free()
 	for c in _e.preview_enemies():
-		_preview_box.add_child(_mini(c))
+		var v := VBoxContainer.new()
+		v.add_theme_constant_override("separation", 2)
+		var l := Style.label("NEXT", 16, Style.MUTED)
+		l.autowrap_mode = TextServer.AUTOWRAP_OFF
+		v.add_child(l)
+		v.add_child(_mini(c))
+		_preview_box.add_child(v)
+	_sync_stack(_e.state.enemy_pile.size())
+
+
+## The enemy pile: a staggered stack of face-down cards behind the current enemy.
+func _sync_stack(n: int) -> void:
+	for c in _stack_layer.get_children():
+		c.queue_free()
+	var shown := mini(n, 8)
+	for k in shown:
+		var i := shown - 1 - k  # deepest card first
+		var cv := CardView.new()
+		cv.set_interactive(false)
+		cv.breathing = false
+		cv.setup(null, ENEMY_CARD)
+		cv.face_up = false
+		cv.position = Vector2(size.x / 2 - ENEMY_CARD.x / 2 + (i + 1) * 12, -(i + 1) * 10)
+		_stack_layer.add_child(cv)
 
 
 func _sync_hand() -> void:
@@ -439,7 +462,11 @@ func _sync_hand() -> void:
 func _add_hand_card(c, delay: float) -> CardView:
 	var cv := CardView.new()
 	cv.setup(c, HAND_CARD)
+	cv.draggable = true
 	cv.tapped.connect(_on_card_tapped)
+	cv.drag_started.connect(_on_drag_started)
+	cv.drag_moved.connect(_on_drag_moved)
+	cv.drag_released.connect(_on_drag_released)
 	_hand_layer.add_child(cv)
 	_hand_views[c.id] = cv
 	_layout_hand()
@@ -469,22 +496,11 @@ func _layout_hand() -> void:
 		cv.z_index = i
 
 
+## Played cards are not shown on a table any more: they tap the enemy and go to the discard pile.
 func _sync_table() -> void:
-	var s = _e.state
-	var ids: Array = s.played.map(func(c): return c.id)
 	for id in _table_views.keys():
-		if not ids.has(id):
-			_table_views[id].queue_free()
-			_table_views.erase(id)
-	for c in s.played:
-		if not _table_views.has(c.id):
-			var cv := CardView.new()
-			cv.set_interactive(false)
-			cv.setup(c, Vector2(76, 106))
-			_table.add_child(cv)
-			_table_views[c.id] = cv
-			cv.pop(0.2)
-	_layout_table()
+		_table_views[id].queue_free()
+	_table_views.clear()
 
 
 func _layout_table() -> void:
@@ -517,18 +533,14 @@ func _update_controls() -> void:
 	_main_btn.disabled = main.is_busy()
 	if playing:
 		_main_btn.text = "End turn"
-		_play_btn.visible = true
-		_play_btn.disabled = main.is_busy() or _selected.is_empty()
-		_hint_label.text = "Select cards and Play them, then End turn – green ones count" if _selected.is_empty() else ""
+		_hint_label.text = "Drag cards onto the enemy to play them – tap to inspect" if _selected.is_empty() else ""
 	elif retaining:
 		_main_btn.text = "Continue"
-		_play_btn.visible = false
 		_hint_label.text = "Tap to keep %d card for next round" % _e.retain_limit()
 	else:
-		_play_btn.visible = false
 		_hint_label.text = ""
 	_draw_btn.text = "Draw\n%d" % s.draw_pile.size()
-	_disc_btn.text = "Discard\n%d" % s.discard.size()
+	_disc_btn.text = "Discard\n%d" % (s.discard.size() + s.played.filter(func(c): return not c.temp).size())
 	_update_total()
 	_update_life_glow()
 	_update_tooltip()
@@ -704,10 +716,8 @@ func _on_card_tapped(cv: CardView) -> void:
 	if c == null:
 		return
 	if s.phase == Phase.PLAY:
-		if _selected.has(c.id):
-			_selected.erase(c.id)
-		else:
-			_selected.append(c.id)
+		# Tap inspects one card (tooltip + preview); drag it onto the enemy to play it.
+		_selected = [] if _selected.has(c.id) else [c.id]
 		main.sfx.play("select")
 	elif s.phase == Phase.RETAIN:
 		if _retain_sel.has(c.id):
@@ -720,13 +730,76 @@ func _on_card_tapped(cv: CardView) -> void:
 	_update_controls()
 
 
-## Play: put the selected cards on the table. Their effects happen now (♦ draws), the round goes on.
-func _on_play() -> void:
-	if main.is_busy() or _e.state.phase != Phase.PLAY or _selected.is_empty():
+# ---------------------------------------------------------------- drag to play
+
+## Everything above the hand counts as "on the enemy" (a large, forgiving drop zone).
+func _drop_zone() -> Rect2:
+	return Rect2(global_position + Vector2(0, 110), Vector2(size.x, _hand_layer.position.y - 130))
+
+
+func _on_drag_started(cv: CardView) -> void:
+	if main.is_busy() or _e.state.phase != Phase.PLAY:
 		return
-	var sel := _selected.duplicate()
-	_selected.clear()
-	main.act(func(): _e.play_cards(sel))
+	_selected = [cv.card_id]
+	cv.z_index = 60
+	cv.set_selected(false)
+	_update_controls()
+
+
+func _on_drag_moved(cv: CardView, pos: Vector2) -> void:
+	if _e.state.phase != Phase.PLAY:
+		return
+	cv.global_position = pos - HAND_CARD / 2 - Vector2(0, 50)
+	cv.rotation = lerpf(cv.rotation, 0.0, 0.3)
+	var over := _drop_zone().has_point(pos)
+	for id in _enemy_views:
+		_enemy_views[id].highlight = Style.GOLD if over else Color(0, 0, 0, 0)
+
+
+func _on_drag_released(cv: CardView, pos: Vector2) -> void:
+	for id in _enemy_views:
+		_enemy_views[id].highlight = Color(0, 0, 0, 0)
+	if _e.state.phase == Phase.PLAY and not main.is_busy() and _drop_zone().has_point(pos) and _hand_views.has(cv.card_id):
+		var id := cv.card_id
+		_hand_views.erase(id)
+		_selected.clear()
+		_tap_enemy(cv)
+		main.act(func(): _e.play_cards([id]))
+		return
+	# Not on the enemy: slide back into the hand.
+	var from := cv.global_position
+	_layout_hand()
+	var to := cv.position
+	cv.global_position = from
+	cv.create_tween().tween_property(cv, "position", to, 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+
+## The played card flies to the enemy, taps it, then drops into the discard pile.
+func _tap_enemy(cv: CardView) -> void:
+	cv.z_index = 60
+	cv.set_interactive(false)
+	cv.breathing = false
+	var center := _enemy_layer.global_position + Vector2(size.x / 2, ENEMY_CARD.y * 0.45)
+	var dest := _disc_btn.get_global_rect().get_center()
+	var tw := cv.create_tween()
+	tw.tween_property(cv, "global_position", center - cv.size / 2 + Vector2(0, 40), 0.14).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.parallel().tween_property(cv, "rotation", -0.18, 0.14)
+	tw.tween_property(cv, "rotation", 0.12, 0.06)
+	tw.parallel().tween_property(cv, "scale", Vector2(1.12, 1.12), 0.06)
+	tw.tween_callback(func():
+		main.burst(center, Style.WHITE, 12)
+		main.shake(5.0)
+		for id in _enemy_views:
+			_enemy_views[id].pop(0.08))
+	tw.tween_property(cv, "rotation", 0.0, 0.06)
+	tw.parallel().tween_property(cv, "scale", Vector2.ONE, 0.06)
+	tw.tween_interval(0.05)
+	tw.tween_property(cv, "global_position", dest - cv.size / 2, 0.28).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN)
+	tw.parallel().tween_property(cv, "scale", Vector2(0.3, 0.3), 0.28)
+	tw.parallel().tween_property(cv, "modulate:a", 0.4, 0.28)
+	tw.tween_callback(cv.queue_free)
+	main.sfx.play("play")
+	_layout_hand()
 
 
 ## End turn: plays anything still selected, then resolves the round (or confirms the kept card).
@@ -819,6 +892,7 @@ func play_event(ev: Dictionary) -> float:
 				cv.flip_to(true, 0.3)
 				_sync_intents(_enemy_views.keys().map(func(id): return _find_card(id)).filter(func(c): return c != null))
 				_left_label.text = _left_text(int(ev.get("total_left", ev["left"] + 1)))
+				_sync_stack(int(ev["left"]))
 			main.sfx.play("flip")
 			return 0.35
 		Ev.HAND_FILLED:
@@ -844,46 +918,28 @@ func play_event(ev: Dictionary) -> float:
 			main.toast("OVERPOWER!", Style.GOLD, 600)
 			main.shake(10.0)
 			main.sfx.play("exact", 0.8)
-			var dest: Vector2 = _disc_btn.get_global_rect().get_center()
-			for id in ev["ids"]:
-				if _table_views.has(id):
-					var cv: CardView = _table_views[id]
-					_table_views.erase(id)
-					var tw := cv.create_tween()
-					tw.tween_property(cv, "global_position", dest - cv.size / 2, 0.35).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN)
-					tw.parallel().tween_property(cv, "scale", Vector2(0.4, 0.4), 0.35)
-					tw.tween_callback(cv.queue_free)
-			_layout_table()
 			return 0.5
 		Ev.CARDS_PLAYED:
+			# Dragged cards are already animating; cards played another way (tests) tap the enemy here.
+			var any := false
 			for id in ev["ids"]:
 				if _hand_views.has(id):
-					_hand_views[id].queue_free()
+					var cv: CardView = _hand_views[id]
 					_hand_views.erase(id)
-				var c = _find_card(id)
-				if c != null and not _table_views.has(id):
-					var cv := CardView.new()
-					cv.set_interactive(false)
-					cv.setup(c, Vector2(76, 106))
-					_table.add_child(cv)
-					_table_views[id] = cv
-					cv.land(0.0, Vector2(0, 300))
+					_tap_enemy(cv)
+					any = true
 			_layout_hand()
-			_layout_table()
-			main.sfx.play("play")
-			return 0.25
+			return 0.3 if any else 0.15
 		Ev.ACE_SACRIFICED:
 			var c = _find_card(ev["temp_id"])
 			if c != null:
 				var cv := CardView.new()
-				cv.set_interactive(false)
-				cv.setup(c, Vector2(76, 106))
-				_table.add_child(cv)
-				_table_views[c.id] = cv
-				_layout_table()
-				cv.land(0.0, Vector2(0, -500))
+				cv.setup(c, HAND_CARD)
+				add_child(cv)
+				cv.global_position = _lives_box.get_global_rect().get_center() - HAND_CARD / 2
+				_tap_enemy(cv)
 			main.flash(Color(0.5, 0.1, 0.6, 0.4))
-			return 0.3
+			return 0.4
 		Ev.LIFE_LOST:
 			for child in _lives_box.get_children():
 				var cv := child as CardView

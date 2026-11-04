@@ -130,16 +130,18 @@ func _reward_via_ui(main) -> void:
 	await scr._on_confirm()
 
 
-## Uses the fight buttons like a player: select the useful cards, Play, then End turn.
+## Fights like a player: drag a useful card onto the enemy while still short, otherwise End turn.
 func _fight_via_ui(main) -> void:
 	var scr = main.screen
 	var e = main.engine
-	var ids: Array = e.playable_cards().map(func(c): return c.id)
-	if not ids.is_empty():
-		scr._selected = ids
-		scr._update_controls()
-		if scr._play_btn.disabled:
-			push_error("Play disabled with cards selected")
-		scr._on_play()
-		return  # next loop step: End turn (or play newly drawn cards)
+	var t: Dictionary = e.compute(e.state.played)
+	var short: bool = int(t["block"]) < int(t["block_need"]) or int(t["attack"]) < int(t["attack_need"])
+	var cards: Array = e.playable_cards()
+	if short and not cards.is_empty() and scr._hand_views.has(cards[0].id):
+		var cv = scr._hand_views[cards[0].id]
+		var drop: Vector2 = scr._drop_zone().get_center()
+		scr._on_drag_started(cv)
+		scr._on_drag_moved(cv, drop)
+		scr._on_drag_released(cv, drop)
+		return
 	scr._on_main()

@@ -3,6 +3,9 @@ extends Control
 ## Visual transforms (lift, squash, tilt, breathing) are applied in _draw so the touch rect stays put.
 
 signal tapped(view)
+signal drag_started(view)
+signal drag_moved(view, global_pos: Vector2)
+signal drag_released(view, global_pos: Vector2)
 
 const Style := preload("res://ui/style.gd")
 const JOKER_TAG := {"dual": "♥♠", "innate": "1st", "double": "x2", "draw2": "+2"}
@@ -18,6 +21,9 @@ var highlight := Color(0, 0, 0, 0)  # glow colour (alpha 0 = none)
 var breathing := true
 var interactive := true
 var crack := 0.0  # 0..1, cracked-ace effect
+var draggable := false
+var dragging := false
+const DRAG_START := 18.0
 
 var lift := 0.0
 var drop := Vector2.ZERO  # visual-only offset used by land(), so layouts/containers keep control of position
@@ -68,8 +74,18 @@ func _gui_input(event: InputEvent) -> void:
 			_press_pos = event.position
 		elif _pressed:
 			_pressed = false
-			if event.position.distance_to(_press_pos) < 40:
+			if dragging:
+				dragging = false
+				drag_released.emit(self, event.global_position)
+			elif event.position.distance_to(_press_pos) < 40:
 				tapped.emit(self)
+		accept_event()
+	elif event is InputEventMouseMotion and _pressed and draggable:
+		if not dragging and event.position.distance_to(_press_pos) > DRAG_START:
+			dragging = true
+			drag_started.emit(self)
+		if dragging:
+			drag_moved.emit(self, event.global_position)
 		accept_event()
 
 

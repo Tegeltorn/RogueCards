@@ -53,6 +53,93 @@ func play_run(e) -> void:
 
 
 func _play(e) -> void:
+	if e.keep_hand():
+		_play_thrifty(e)
+	else:
+		_play_all(e)
+
+
+## Cards stay in hand between rounds: play the cheapest set that does the job, ♦ first (they draw),
+## save the rest. If the enemy can't be stopped, only play enough to avoid the 2-life miss.
+func _play_thrifty(e) -> void:
+	var s = e.state
+	var graded := int(s.balance["graded_threshold"])
+	for _guard in 16:
+		var bneed: int = e.block_need()
+		var aneed: int = e.attack_need()
+		var t: Dictionary = e.compute(s.played)
+		var short_block: bool = bneed > 0 and int(t["block"]) < bneed
+		var short_atk: bool = aneed > 0 and int(t["attack"]) < aneed
+		if not short_block and not short_atk:
+			break
+		var cards: Array = e.playable_cards()
+		var best := _cheapest_set(e, cards, true)
+		if best.is_empty():
+			# Can't make it with this hand: try to dig for better cards first.
+			var blacks: Array = s.hand.filter(func(c): return c.is_black() and not c.is_red())
+			if short_block and not s.overpowered and e.overpower_value(s.played + blacks) > 0:
+				e.play_cards(_ids(blacks))  # overpower: unclog the black cards, draw 1
+				continue
+			var dias: Array = s.hand.filter(func(c): return c.suit == "D")
+			if not dias.is_empty():
+				e.play_cards([dias[0].id])  # ♦ always draws
+				continue
+			if short_block:
+				best = _cheapest_set(e, cards, false)
+		if best.is_empty():
+			break
+		var drawers: Array = best.filter(func(c): return c.suit == "D" or c.joker == "draw2")
+		if not drawers.is_empty() and best.size() > 1:
+			e.play_cards([drawers[0].id])  # draw first, then re-plan with the new card
+			continue
+		e.play_cards(_ids(best))
+		if not drawers.is_empty():
+			continue  # the drawn card may help
+		break
+	var need: int = e.block_need()
+	if need > 0:
+		var miss: int = need - int(e.compute(s.played)["block"])
+		if miss >= graded:
+			for a in e.sacrificable_aces():
+				if a.base_red() or not s.balance["ace_sac_own_color"]:
+					e.sacrifice_ace(a.id)
+					break
+	e.resolve()
+
+
+## Smallest-value subset of `cards` that reaches the need (full = true) or that keeps a block miss
+## below the graded threshold (full = false). Returns [] if none does.
+static func _cheapest_set(e, cards: Array, full: bool) -> Array:
+	var s = e.state
+	var bneed: int = e.block_need()
+	var aneed: int = e.attack_need()
+	var graded := int(s.balance["graded_threshold"])
+	var best: Array = []
+	var best_cost := 1 << 30
+	var n := mini(cards.size(), 10)
+	for mask in range(1, 1 << n):
+		var sub: Array = []
+		var cost := 0
+		for i in n:
+			if mask & (1 << i):
+				sub.append(cards[i])
+				cost += cards[i].value() * 10 + 1
+		if cost >= best_cost:
+			continue
+		var t: Dictionary = e.compute(s.played + sub)
+		var ok: bool
+		if full:
+			ok = int(t["block"]) >= bneed and int(t["attack"]) >= aneed
+		else:
+			ok = bneed - int(t["block"]) < graded
+		if ok:
+			best = sub
+			best_cost = cost
+	return best
+
+
+## Old rules (unplayed cards are discarded): play every card that counts.
+func _play_all(e) -> void:
 	# Play all usable cards; repeat while ♦ / draw2 bring in new usable cards.
 	while true:
 		var p: Array = e.playable_cards()

@@ -71,9 +71,9 @@ static func rules_overlay(main) -> Control:
 	var b: Dictionary = main.engine.state.balance if main.engine != null else main.balance()
 	var H := "[color=#f4b942]%s[/color]"
 	var txt := """%s  An enemy card is revealed. [color=#e0383e]Black = attack[/color], [color=#3d8bfd]red = shield[/color]. Its value is its rank.
-• You draw up to %d cards.
-• Select cards and press Play. Their effects happen at once (♦ draws a card) and you can keep playing. Only the right colour counts (green outline): red cards block attacks, black cards break shields.
-• Press End turn to finish the round: the enemy card is resolved.
+• Your hand is filled up to %d cards. Cards you don't play stay in your hand.
+• Drag a card onto the enemy to play it. Its effect happens at once (♦ draws a card). Only the right colour counts (green outline): red cards block attacks, black cards break shields. Tap a card to see what it does.
+• Press End turn: the enemy acts and the round is resolved.
 
 %s
 ♥ Block. Leftover block is stored as shield for the next round (with no attack: the full value).
@@ -83,10 +83,9 @@ static func rules_overlay(main) -> Control:
 Tip: select a single card to see what it does.
 
 %s  If your block is too low you lose a life (a miss of %d or more costs 2). The attack card is beaten either way.
-%s  Play black cards worth %d× an attack: they are discarded and you draw 1 card. The enemy still attacks at End turn.
+%s  Once per round, black cards played against an attack worth %d× its value: they are discarded and you draw 1 card. The enemy still attacks at End turn.
 %s  Break it with enough attack, or it goes to the bottom of the enemy pile and comes back.
 %s  Your aces at the bottom. Tap them to see them, or to sacrifice one: you lose that life and it counts as %d this round.
-%s  Keep up to %d unplayed card(s) for the next round.
 
 %s  A shield with no black enemy cards left behind it is a last stand: fail to break it and you lose a life.
 %s  The suit of the last beaten card decides: ♠ pick any beaten card · ♣ reveal 2, take 1, remove 1 · ♥ heal a life · ♦ reveal 2, take both. Your deck holds up to %d cards; when it is full you swap or decline.
@@ -97,7 +96,6 @@ Tip: select a single card to see what it does.
 		H % "OVERPOWER", int(b.get("overpower_multiplier", 2)),
 		H % "SHIELD",
 		H % "LIVES", int(b["ace_value"]),
-		H % "KEEP", int(b["retain"]),
 		H % "LAST STAND",
 		H % "REWARDS", int(b["deck_cap"]),
 		H % "THE ROAD", int(b.get("first_floor", 4)), int(b["boss_hand_size"])]

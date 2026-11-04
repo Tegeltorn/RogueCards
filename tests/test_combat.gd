@@ -160,7 +160,7 @@ func test_ace_sacrifice_needs_two_lives() -> void:
 
 
 func test_retain_limit() -> void:
-	var e := scenario(["2H", "5S", "6S"], ["3S"], {}, {"pile": ["4S"]})
+	var e := scenario(["2H", "5S", "6S"], ["3S"], {"keep_hand": false}, {"pile": ["4S"]})
 	e.play_cards([e.state.hand[0].id])
 	e.resolve()
 	eq(e.state.phase, Phase.RETAIN, "retain phase")
@@ -202,3 +202,31 @@ func test_no_overpower_below_double() -> void:
 	e.play_cards([e.state.hand[0].id])  # 7 < 10
 	check(not has_event(e, Ev.OVERPOWER), "not enough")
 	eq(e.state.played.size(), 1, "card stays on the table")
+
+
+func test_keep_hand_between_rounds() -> void:
+	var e := scenario(["2H", "5S", "6S"], ["3S"], {"hand_size": 3}, {"pile": ["4S"]})
+	e.state.draw_pile = cards(e, ["9D"])
+	e.play_cards([e.state.hand[0].id])
+	e.resolve()
+	eq(e.state.phase, Phase.PLAY, "no keep step")
+	eq(e.state.hand.size(), 3, "5♠ and 6♠ stay, one card drawn")
+	check(e.state.hand.any(func(c): return c.label() == "9♦"), "drew up to the hand size")
+
+
+func test_overpower_counts_cards_played_separately() -> void:
+	var e := scenario(["4S", "3S", "2H"], ["5S"], {}, {"pile": ["9S"]})
+	e.state.draw_pile = cards(e, ["6D", "7D"])
+	e.play_cards([e.state.hand[0].id])  # 4♠ = 6 < 10
+	check(not has_event(e, Ev.OVERPOWER), "not yet")
+	e.play_cards([e.state.hand[0].id])  # + 3♠ = 4 → 10 >= 10
+	check(has_event(e, Ev.OVERPOWER), "overpower from both plays")
+	var n := e.state.hand.size()
+	e.state.hand.append(card(e, "5C"))
+	e.state.hand.append(card(e, "6C"))
+	e.play_cards([e.state.hand[n].id, e.state.hand[n + 1].id])
+	var count := 0
+	for ev in e.state.events:
+		if ev["type"] == Ev.OVERPOWER:
+			count += 1
+	eq(count, 1, "only once per round")
