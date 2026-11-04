@@ -11,8 +11,9 @@
 ## Graphics, shaders and sound
 Everything is made for this project:
 - Cards and suit symbols are drawn in code (`ui/card_view.gd`).
-- The shaders are in `ui/fx/`.
-- The sounds are synthesized at runtime (`ui/sfx.gd`).
+- The shaders are in `ui/fx/`. The drifting smoke is a small fluid simulation (`ui/fx/smoke.gd`).
+- The sounds are synthesized at runtime (`ui/sfx.gd`): plucked strings (Karplus-Strong), wooden knocks,
+  parchment rustles, a frame drum and a hand bell.
 
 There are no third-party graphics or sounds. The style is inspired by medieval illuminated manuscripts and Pre-Raphaelite painting but uses no assets, names or fonts from any other game.
 

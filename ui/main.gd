@@ -9,6 +9,7 @@ const Ev := preload("res://engine/events.gd")
 const Style := preload("res://ui/style.gd")
 const Store := preload("res://ui/store.gd")
 const Sfx := preload("res://ui/sfx.gd")
+const Smoke := preload("res://ui/fx/smoke.gd")
 const Phase := GameState.Phase
 
 const SCREENS := {
@@ -30,6 +31,7 @@ var screen: Control
 var screen_name := ""
 
 var _bg: ColorRect
+var _smoke: Smoke
 var _shake_root: Control
 var _holder: Control
 var _overlay: Control
@@ -51,6 +53,9 @@ func _ready() -> void:
 	_bg.material = bgm
 	_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(Style.full(_bg))
+	# Smoke drifts over the page, behind the cards and text.
+	_smoke = Smoke.new()
+	add_child(Style.full(_smoke))
 	_shake_root = Style.full(Control.new())
 	_shake_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_shake_root)
@@ -91,6 +96,7 @@ func _process(delta: float) -> void:
 func apply_settings() -> void:
 	_crt.visible = bool(settings.get("crt", true))
 	sfx.enabled = bool(settings.get("sound", true))
+	_smoke.set_simulated(not bool(settings.get("smoke_simple", false)))
 	_apply_palette()
 	Store.save_settings(settings)
 
@@ -110,6 +116,10 @@ func _apply_palette() -> void:
 	var crtm: ShaderMaterial = _crt.material
 	crtm.set_shader_parameter("tint", Color(0, 0, 0) if Style.night else Color(0.25, 0.14, 0.06))
 	crtm.set_shader_parameter("vignette", 0.4 if Style.night else 0.22)
+	if Style.night:
+		_smoke.set_colors(Color("eee6da"), Color(0, 0, 0), 0.26)
+	else:
+		_smoke.set_colors(Color("fffaf0"), Color("6b4a2e"), 0.75)
 	if changed and screen != null:
 		# Screens bake colours in when built, so rebuild the visible one.
 		var n := screen_name
@@ -309,6 +319,7 @@ func flash(color: Color = Color(1, 1, 1, 0.6), dur: float = 0.25) -> void:
 
 
 func burst(pos: Vector2, color: Color, amount: int = 40) -> void:
+	_smoke.puff(pos, clampf(amount / 40.0, 0.4, 1.5))
 	var p := CPUParticles2D.new()
 	p.position = pos
 	p.amount = amount
