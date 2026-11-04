@@ -157,9 +157,12 @@ func _on_start() -> void:
 					main.fly_card(s.find_in(s.setup_options, ids[i]), cv.get_global_rect(), target + Vector2(i * 78, 0), Vector2(70, 98))
 		_start.disabled = true
 		await get_tree().create_timer(0.5).timeout
+		# The fight starts right after the pick.
 		main.act(func():
 			for id in ids:
-				main.engine.setup_pick(id))
+				main.engine.setup_pick(id)
+			if main.engine.state.phase == Phase.REVEAL:
+				main.engine.ack_reveal())
 		return
 	main.sfx.play("play")
 	main.act(func(): main.engine.ack_reveal())

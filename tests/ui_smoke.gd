@@ -40,6 +40,8 @@ func _run() -> void:
 			await _shot(main, main.screen_name + "_" + main.engine.state.phase_name())
 			if r == 0 and main.screen_name == "reward":
 				await _reward_via_ui(main)
+			elif r == 0 and main.screen_name == "combat" and main.engine.state.phase == main.Phase.PLAY:
+				_fight_via_ui(main)
 			else:
 				main.act(func(): bot.step(main.engine))
 			await _wait(main)
@@ -83,11 +85,16 @@ func _shot(main, name: String) -> void:
 
 ## Opens the in-fight overlays and the one-card tooltip once (catches script errors, takes shots).
 func _overlays(main) -> void:
-	main.act(func(): main.engine.ack_reveal() if main.engine.state.phase == main.Phase.REVEAL else null)
-	await _wait(main)
+	# Start pick through the reveal screen: select the three(s), confirm; the fight must start at once.
 	if main.engine.state.phase == main.Phase.SETUP_PICK:
-		main.act(func(): main.engine.setup_pick(main.engine.state.setup_options[0].id))
+		var scr0 = main.screen
+		for i in main.engine.state.setup_picks:
+			scr0._on_pick(main.engine.state.setup_options[i].id)
+		await scr0._on_start()
 		await _wait(main)
+		if main.engine.state.phase != main.Phase.PLAY:
+			push_error("fight did not start after the start pick: " + main.engine.state.phase_name())
+	else:
 		main.act(func(): main.engine.ack_reveal())
 		await _wait(main)
 	var Help = load("res://ui/screens/help.gd")
@@ -121,3 +128,18 @@ func _reward_via_ui(main) -> void:
 		main.act(func(): Bot.new().step(main.engine))
 		return
 	await scr._on_confirm()
+
+
+## Uses the fight buttons like a player: select the useful cards, Play, then End turn.
+func _fight_via_ui(main) -> void:
+	var scr = main.screen
+	var e = main.engine
+	var ids: Array = e.playable_cards().map(func(c): return c.id)
+	if not ids.is_empty():
+		scr._selected = ids
+		scr._update_controls()
+		if scr._play_btn.disabled:
+			push_error("Play disabled with cards selected")
+		scr._on_play()
+		return  # next loop step: End turn (or play newly drawn cards)
+	scr._on_main()

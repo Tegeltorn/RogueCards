@@ -79,6 +79,7 @@ var _table_views: Dictionary = {}
 var _selected: Array = []
 var _retain_sel: Array = []
 var _main_btn: Button
+var _play_btn: Button
 var _help_btn: Button
 var _tooltip: PanelContainer
 var _tooltip_label: Label
@@ -201,8 +202,12 @@ func _build() -> void:
 	_disc_btn.custom_minimum_size = Vector2(110, 80)
 	_disc_btn.pressed.connect(func(): _show_pile("Discard pile", _e.state.discard))
 	add_child(_disc_btn)
-	_main_btn = Style.button("Done", Style.RED, 34)
-	_main_btn.custom_minimum_size = Vector2(220, 92)
+	_play_btn = Style.button("Play", Style.GREEN, 30)
+	_play_btn.custom_minimum_size = Vector2(124, 92)
+	_play_btn.pressed.connect(_on_play)
+	add_child(_play_btn)
+	_main_btn = Style.button("End turn", Style.RED, 26)
+	_main_btn.custom_minimum_size = Vector2(134, 92)
 	_main_btn.pressed.connect(_on_main)
 	add_child(_main_btn)
 
@@ -267,8 +272,11 @@ func _layout() -> void:
 	_lives_caption.size = Vector2(180, 22)
 	_draw_btn.position = Vector2(14, by)
 	_disc_btn.position = Vector2(W - 124, by)
-	_main_btn.position = Vector2(W / 2 - 40, by - 6)
-	_main_btn.size = Vector2(220, 92)
+	# Bottom bar: Draw | lives | Play | End turn | Discard
+	_play_btn.position = Vector2(W - 124 - 8 - 134 - 6 - 124, by - 6)
+	_play_btn.size = Vector2(124, 92)
+	_main_btn.position = Vector2(W - 124 - 8 - 134, by - 6)
+	_main_btn.size = Vector2(134, 92)
 	var hy := by - HAND_CARD.y - 40
 	_hand_layer.position = Vector2(0, hy)
 	_hand_layer.size = Vector2(W, HAND_CARD.y)
@@ -492,12 +500,16 @@ func _update_controls() -> void:
 			cv.highlight = Color(0, 0, 0, 0)
 	_main_btn.disabled = main.is_busy()
 	if playing:
-		_main_btn.text = "Play" if not _selected.is_empty() else "Done"
-		_hint_label.text = "Tap cards to play them – green ones count" if _selected.is_empty() else ""
+		_main_btn.text = "End turn"
+		_play_btn.visible = true
+		_play_btn.disabled = main.is_busy() or _selected.is_empty()
+		_hint_label.text = "Select cards and Play them, then End turn – green ones count" if _selected.is_empty() else ""
 	elif retaining:
 		_main_btn.text = "Continue"
+		_play_btn.visible = false
 		_hint_label.text = "Tap to keep %d card for next round" % _e.retain_limit()
 	else:
+		_play_btn.visible = false
 		_hint_label.text = ""
 	_draw_btn.text = "Draw\n%d" % s.draw_pile.size()
 	_disc_btn.text = "Discard\n%d" % s.discard.size()
@@ -646,6 +658,16 @@ func _on_card_tapped(cv: CardView) -> void:
 	_update_controls()
 
 
+## Play: put the selected cards on the table. Their effects happen now (♦ draws), the round goes on.
+func _on_play() -> void:
+	if main.is_busy() or _e.state.phase != Phase.PLAY or _selected.is_empty():
+		return
+	var sel := _selected.duplicate()
+	_selected.clear()
+	main.act(func(): _e.play_cards(sel))
+
+
+## End turn: plays anything still selected, then resolves the round (or confirms the kept card).
 func _on_main() -> void:
 	if main.is_busy():
 		return
@@ -654,17 +676,9 @@ func _on_main() -> void:
 		var sel := _selected.duplicate()
 		_selected.clear()
 		main.act(func():
-			if sel.is_empty():
-				_e.resolve()
-				return
-			var before: Array = s.hand.map(func(c): return c.id)
-			_e.play_cards(sel)
-			var fresh := false
-			for c in s.hand:
-				if not before.has(c.id):
-					fresh = true
-			if not fresh:
-				_e.resolve())
+			if not sel.is_empty():
+				_e.play_cards(sel)
+			_e.resolve())
 	elif s.phase == Phase.RETAIN:
 		var keep := _retain_sel.duplicate()
 		_retain_sel.clear()

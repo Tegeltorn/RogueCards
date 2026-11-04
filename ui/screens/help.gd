@@ -72,8 +72,8 @@ static func rules_overlay(main) -> Control:
 	var H := "[color=#f4b942]%s[/color]"
 	var txt := """%s  An enemy card is revealed. [color=#e0383e]Black = attack[/color], [color=#3d8bfd]red = shield[/color]. Its value is its rank.
 • You draw up to %d cards.
-• Tap any cards and press Play. Only the right colour counts (green outline): red cards block attacks, black cards break shields.
-• Press Done to finish the round.
+• Select cards and press Play. Their effects happen at once (♦ draws a card) and you can keep playing. Only the right colour counts (green outline): red cards block attacks, black cards break shields.
+• Press End turn to finish the round: the enemy card is resolved.
 
 %s
 ♥ Block. Leftover block is stored as shield for the next round (with no attack: the full value).
