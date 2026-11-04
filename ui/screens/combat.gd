@@ -1024,13 +1024,19 @@ func play_event(ev: Dictionary) -> float:
 			if _enemy_views.has(ev["id"]):
 				var cv: CardView = _enemy_views[ev["id"]]
 				var center := cv.get_global_rect().get_center()
-				main.burst(center, Style.suit_color(ev["suit"]) if ev["suit"] != "J" else Style.GOLD, 46)
 				main.burst(center, Style.GOLD, 16)
+				cv.breathing = false
+				cv.pop(0.1)
+				# Beaten: a crack runs across it and its colour drains away, then it fades off the table.
 				var tw := cv.create_tween()
-				tw.tween_property(cv, "scale", cv.scale * 1.2, 0.08)
-				tw.tween_property(cv, "scale", Vector2(0.01, 0.01), 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
+				tw.tween_property(cv, "crack", 1.0, 0.28).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+				tw.parallel().tween_property(cv, "grey", 1.0, 0.4)
+				tw.tween_interval(0.35)
+				tw.tween_property(cv, "modulate:a", 0.0, 0.3)
+				tw.parallel().tween_property(cv, "drop", Vector2(0, 24), 0.3).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+				main.sfx.play("crack", 1.15)
 			main.sfx.play("defeat")
-			return 0.35
+			return 0.75
 		Ev.RETAINED:
 			for id in _table_views.keys():
 				_table_views[id].queue_free()
