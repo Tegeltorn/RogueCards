@@ -34,7 +34,10 @@ func _run() -> void:
 			await _overlays(main)
 		while main.engine.state.result == "" and steps < 400:
 			await _shot(main, main.screen_name + "_" + main.engine.state.phase_name())
-			main.act(func(): bot.step(main.engine))
+			if r == 0 and main.screen_name == "reward":
+				await _reward_via_ui(main)
+			else:
+				main.act(func(): bot.step(main.engine))
 			await _wait(main)
 			steps += 1
 			if main.screen_name != main._screen_for_phase():
@@ -98,3 +101,19 @@ func _overlays(main) -> void:
 		p.queue_free()
 		await process_frame
 		await process_frame
+
+
+## Uses the reward screen like a player: select, (pick a deck card), confirm.
+func _reward_via_ui(main) -> void:
+	var scr = main.screen
+	var s = main.engine.state
+	if s.phase == main.Phase.REWARD:
+		scr._on_option(s.reward["options"][0].id)
+	if scr._deck_pickable():
+		scr._on_deck(s.deck[0].id)
+	await _shot(main, "reward_selected_" + s.phase_name())
+	if scr._confirm.disabled:
+		push_error("reward confirm disabled in " + s.phase_name())
+		main.act(func(): Bot.new().step(main.engine))
+		return
+	scr._on_confirm()

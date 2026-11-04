@@ -24,7 +24,11 @@ var _opts: HFlowContainer
 var _deck_label: Label
 var _deck: HFlowContainer
 var _skip: Button
-var _swap_for := -1  # option id waiting for a deck card to replace
+var _confirm: Button
+var _opt_sel := -1   # selected reward option (card id)
+var _deck_sel := -1  # selected deck card (swap target, card to remove, or joker target)
+var _opt_views: Dictionary = {}
+var _deck_views: Dictionary = {}
 
 
 func enter() -> void:
@@ -53,8 +57,16 @@ func enter() -> void:
 	_opts.alignment = FlowContainer.ALIGNMENT_CENTER
 	_opts.add_theme_constant_override("h_separation", 16)
 	_opts.add_theme_constant_override("v_separation", 16)
-	_v.add_child(_opts)
-	_skip = Style.button("Decline", Style.BLACK, 28)
+	# Room above the options so a selected (lifted) card doesn't cover the prompt.
+	var pad := MarginContainer.new()
+	pad.add_theme_constant_override("margin_top", 40)
+	pad.add_child(_opts)
+	_v.add_child(pad)
+	_confirm = Style.button("", Style.RED, 32)
+	_confirm.custom_minimum_size.y = 90
+	_confirm.pressed.connect(_on_confirm)
+	_v.add_child(_confirm)
+	_skip = Style.button("Decline", Style.BLACK, 26)
 	_skip.pressed.connect(_on_skip)
 	_v.add_child(_skip)
 	_deck_label = Style.label("", 26, Style.MUTED)
@@ -67,6 +79,7 @@ func enter() -> void:
 	refresh()
 
 
+## Rebuilds the cards for the current phase (selection changes only call _update_sel).
 func refresh() -> void:
 	if _e == null:
 		return
@@ -75,9 +88,9 @@ func refresh() -> void:
 		c.queue_free()
 	for c in _deck.get_children():
 		c.queue_free()
+	_opt_views.clear()
+	_deck_views.clear()
 	_title.text = "FLOOR %s CLEARED" % Style.floor_text(s.floor_num)
-	_skip.visible = false
-	var deck_tap := Callable()
 	match s.phase:
 		Phase.REWARD:
 			var r: Dictionary = s.reward
@@ -86,31 +99,22 @@ func refresh() -> void:
 			var healed: int = int(_last_offer().get("healed", 0))
 			if healed > 0:
 				_sub.text += "\nYou got %d life back!" % healed
-			var picks := int(r.get("picks", 0))
-			if _swap_for >= 0 and s.find_in(r["options"], _swap_for) != null:
-				_prompt.text = "Your deck is full: tap the card to swap out"
-				deck_tap = func(card): _take(_swap_for, card.id)
-			else:
-				_swap_for = -1
-				_prompt.text = "Take %d cards" % picks if picks > 1 else "Take a card"
+			if s.find_in(r["options"], _opt_sel) == null:
+				_opt_sel = -1
+				_deck_sel = -1
 			for i in r["options"].size():
 				var o = r["options"][i]
 				var cv := CardView.new()
 				cv.setup(o, Vector2(150, 210))
-				cv.highlight = Style.GOLD if o.id == _swap_for else Color(0, 0, 0, 0)
-				cv.tapped.connect(func(_x): _on_option(o))
+				cv.tapped.connect(func(_x): _on_option(o.id))
 				_opts.add_child(cv)
+				_opt_views[o.id] = cv
 				cv.land(i * 0.08)
-			_skip.visible = _e.can_decline()
-			_skip.text = "Decline" if _swap_for < 0 else "Decline this card"
 		Phase.REWARD_REMOVE:
 			_sub.text = "Clubs reward"
-			_prompt.text = "Remove a card from your deck"
-			deck_tap = func(card): main.act(func(): _e.reward_remove(card.id))
 		Phase.JOKER_ATTACH:
 			_title.text = "RED JOKER"
 			_sub.text = _joker_desc()
-			_prompt.text = "Attach the joker under a card in your deck"
 			var jv := CardView.new()
 			jv.set_interactive(false)
 			jv.rank = 0
@@ -118,7 +122,8 @@ func refresh() -> void:
 			jv.setup(null, Vector2(150, 210))
 			_opts.add_child(jv)
 			jv.land()
-			deck_tap = func(card): main.act(func(): _e.attach_joker(card.id))
+	if s.find_in(s.deck, _deck_sel) == null:
+		_deck_sel = -1
 	_deck_label.text = "Your deck (%d/%d)" % [s.deck.size(), int(s.balance["deck_cap"])]
 	var sorted: Array = s.deck.duplicate()
 	sorted.sort_custom(func(a, b): return a.suit < b.suit or (a.suit == b.suit and a.rank < b.rank))
@@ -126,37 +131,116 @@ func refresh() -> void:
 		var cv := CardView.new()
 		cv.setup(c, Vector2(110, 154))
 		cv.breathing = false
-		if deck_tap.is_valid():
-			var cb := deck_tap
-			cv.tapped.connect(func(_x): cb.call(c))
-			cv.highlight = Color(Style.GOLD, 0.6)
-		else:
-			cv.set_interactive(false)
+		cv.tapped.connect(func(_x): _on_deck(c.id))
 		_deck.add_child(cv)
+		_deck_views[c.id] = cv
+	_update_sel()
 
 
-func _on_option(o) -> void:
+## Deck cards can be picked when swapping (full deck), removing (♣) or attaching the red joker.
+func _deck_pickable() -> bool:
+	var s = _e.state
+	match s.phase:
+		Phase.REWARD:
+			return _opt_sel >= 0 and _e.deck_full()
+		Phase.REWARD_REMOVE, Phase.JOKER_ATTACH:
+			return true
+	return false
+
+
+## Highlights the selection (lifted + gold, like in a fight) and sets the confirm button.
+func _update_sel() -> void:
+	var s = _e.state
+	for id in _opt_views:
+		var cv: CardView = _opt_views[id]
+		cv.set_selected(id == _opt_sel)
+		cv.highlight = Style.GOLD if id == _opt_sel else Color(0, 0, 0, 0)
+	var pickable := _deck_pickable()
+	for id in _deck_views:
+		var cv: CardView = _deck_views[id]
+		cv.set_interactive(pickable)
+		cv.set_selected(pickable and id == _deck_sel)
+		if pickable and id == _deck_sel:
+			cv.highlight = Style.GOLD
+		elif pickable:
+			cv.highlight = Color(Style.GOLD, 0.3)
+		else:
+			cv.highlight = Color(0, 0, 0, 0)
+	var opt = s.find_in(s.reward.get("options", []), _opt_sel) if s.phase == Phase.REWARD else null
+	var dk = s.find_in(s.deck, _deck_sel)
+	_skip.visible = false
+	match s.phase:
+		Phase.REWARD:
+			var picks := int(s.reward.get("picks", 0))
+			if opt == null:
+				_prompt.text = "Tap a card to take (%d left)" % picks if picks > 1 else "Tap a card to take"
+				_set_confirm("Pick a card", false)
+			elif not _e.deck_full():
+				_prompt.text = "Take %s?" % opt.label()
+				_set_confirm("Take %s" % opt.label(), true)
+			elif dk == null:
+				_prompt.text = "Your deck is full: tap a card in your deck to swap out"
+				_set_confirm("Pick a card to swap out", false)
+			else:
+				_prompt.text = "Swap %s for %s?" % [dk.label(), opt.label()]
+				_set_confirm("Swap %s for %s" % [dk.label(), opt.label()], true)
+			_skip.visible = _e.can_decline()
+			_skip.text = "Decline %s" % opt.label() if opt != null else "Decline the reward"
+		Phase.REWARD_REMOVE:
+			_prompt.text = "Tap a card in your deck to remove"
+			_set_confirm("Remove %s" % dk.label() if dk != null else "Pick a card to remove", dk != null)
+		Phase.JOKER_ATTACH:
+			_prompt.text = "Tap a card in your deck to attach the joker to"
+			_set_confirm("Attach to %s" % dk.label() if dk != null else "Pick a card", dk != null)
+
+
+func _set_confirm(text: String, enabled: bool) -> void:
+	_confirm.text = text
+	_confirm.disabled = not enabled
+
+
+func _on_option(id: int) -> void:
 	if main.is_busy():
 		return
+	_opt_sel = -1 if _opt_sel == id else id
 	main.sfx.play("select")
-	if _e.deck_full():
-		_swap_for = o.id
-		refresh()
-	else:
-		_take(o.id, -1)
+	_update_sel()
 
 
-func _take(opt_id: int, replace_id: int) -> void:
-	_swap_for = -1
+func _on_deck(id: int) -> void:
+	if main.is_busy() or not _deck_pickable():
+		return
+	_deck_sel = -1 if _deck_sel == id else id
+	main.sfx.play("select")
+	_update_sel()
+
+
+func _on_confirm() -> void:
+	if main.is_busy() or _confirm.disabled:
+		return
+	var s = _e.state
+	var opt := _opt_sel
+	var dk := _deck_sel
+	_opt_sel = -1
+	_deck_sel = -1
 	main.sfx.play("reward")
-	main.act(func(): _e.reward_take(opt_id, replace_id))
+	match s.phase:
+		Phase.REWARD:
+			main.act(func(): _e.reward_take(opt, dk if _e.deck_full() else -1))
+		Phase.REWARD_REMOVE:
+			main.act(func(): _e.reward_remove(dk))
+		Phase.JOKER_ATTACH:
+			main.act(func(): _e.attach_joker(dk))
 
 
 func _on_skip() -> void:
-	if _swap_for >= 0:
-		var id := _swap_for
-		_swap_for = -1
-		main.act(func(): _e.reward_decline(id))
+	if main.is_busy():
+		return
+	var opt := _opt_sel
+	_opt_sel = -1
+	_deck_sel = -1
+	if opt >= 0:
+		main.act(func(): _e.reward_decline(opt))
 	else:
 		main.act(func(): _e.reward_skip())
 
