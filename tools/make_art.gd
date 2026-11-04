@@ -1,7 +1,6 @@
 extends SceneTree
-## Renders the app icon and the loading-screen image with the game's own card drawing and fonts,
-## so they always match the theme. Needs a display:
-##   xvfb-run -a godot --path . --rendering-driver opengl3 --script res://tools/make_art.gd -- icon
+## Renders the loading-screen image with the game's own card drawing and fonts, so it always
+## matches the theme. (The app icons are painted artwork, see CREDITS.md; this never touches them.)
 ##   xvfb-run -a godot --path . --rendering-driver opengl3 --script res://tools/make_art.gd -- splash
 
 const Style := preload("res://ui/style.gd")
@@ -9,25 +8,22 @@ const CardView := preload("res://ui/card_view.gd")
 
 
 func _init() -> void:
-	var what: String = OS.get_cmdline_user_args()[0] if OS.get_cmdline_user_args().size() > 0 else "icon"
+	var what := "splash"
 	# A SubViewport renders at exact pixels (the game window itself stretches a 720x1280 canvas).
 	var vp := SubViewport.new()
-	vp.size = Vector2i(512, 512) if what == "icon" else Vector2i(720, 660)
-	vp.transparent_bg = what != "icon"
+	vp.size = Vector2i(720, 660)
+	vp.transparent_bg = true
 	vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS
 	root.add_child(vp)
 	var stage := Control.new()
 	stage.theme = Style.theme()
 	vp.add_child(stage)
 	stage.size = Vector2(vp.size)
-	if what == "icon":
-		_icon(stage)
-	else:
-		_splash(stage)
+	_splash(stage)
 	for i in 8:
 		await process_frame
 	var img := vp.get_texture().get_image()
-	var out := "res://icon.png" if what == "icon" else "res://assets/splash.png"
+	var out := "res://assets/splash.png"
 	img.save_png(out)
 	print("saved ", out, " ", img.get_size())
 	quit()
@@ -43,20 +39,6 @@ func _card(parent: Control, rank: int, suit: String, sz: Vector2, pos: Vector2, 
 	cv.position = pos
 	cv.rotation = rot
 	parent.add_child(cv)
-
-
-func _icon(stage: Control) -> void:
-	var bg := ColorRect.new()
-	var m := ShaderMaterial.new()
-	m.shader = load("res://ui/fx/background.gdshader")
-	m.set_shader_parameter("color_a", Style.BG_A)
-	m.set_shader_parameter("color_b", Style.BG_B)
-	m.set_shader_parameter("edge", 0.9)
-	bg.material = m
-	stage.add_child(Style.full(bg))
-	var sz := Vector2(250, 350)
-	_card(stage, 14, "H", sz, Vector2(60, 100), -0.26)
-	_card(stage, 14, "S", sz, Vector2(200, 70), 0.14)
 
 
 func _splash(stage: Control) -> void:
