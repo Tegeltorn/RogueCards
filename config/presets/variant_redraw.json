@@ -1,0 +1,13 @@
+{
+  "_note": "Variant C (Keep + redraw): keep hand 4 (3 on J/Q/K), once per floor discard any cards and draw one fewer, continuous refill, no burn/overpower/perfect draw",
+  "keep_hand": true,
+  "hand_size": 4,
+  "face_hand_size": 3,
+  "redraw_limit": 1,
+  "redraw_scope": "floor",
+  "redraw_cost": 1,
+  "refill_mode": "continuous",
+  "burn_mode": "off",
+  "overpower_multiplier": 0,
+  "perfect_draw": 0
+}

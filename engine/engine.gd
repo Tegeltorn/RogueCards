@@ -56,6 +56,8 @@ func start_run(p_seed: int, balance: Dictionary = {}, options: Dictionary = {}) 
 	state.mod_ace = aces.pop_front()
 	state.mod_suit = state.mod_ace.suit
 	state.lives = aces.slice(0, int(b["lives"]))
+	if state.lives.size() < int(b["lives"]) and not b["mods_enabled"]:
+		state.lives.append(state.mod_ace)  # no mods: the fourth ace is a life too
 	state.max_lives = state.lives.size()
 
 	# Mod.
@@ -192,9 +194,13 @@ func _next_round() -> void:
 		state.hand = state.retained
 	state.retained = []
 	# The face cards (Jack, Queen, King floors) demand tribute: a smaller hand.
-	var limit := int(state.balance["face_hand_size"] if state.floor_num >= 11 else state.balance["hand_size"])
-	# Draw up to the hand size, but always at least `min_draw` cards.
+	var limit := hand_limit()
+	# Draw up to the hand size, but always at least `min_draw` cards. With `draw_per_turn` > 0 the
+	# floor's first hand is drawn up to the hand size, every later round draws that many cards.
 	var to_draw := maxi(limit - state.hand.size(), int(state.balance.get("min_draw", 0))) + state.bonus_draw
+	var per_turn := int(state.balance.get("draw_per_turn", 0))
+	if per_turn > 0 and state.floor_round > 1:
+		to_draw = per_turn + state.bonus_draw
 	state.bonus_draw = 0
 	if state.skip_refill:
 		# You burned last round: no new cards this time.
@@ -207,11 +213,28 @@ func _next_round() -> void:
 		_reshuffle()
 	for i in to_draw:
 		var d = _draw_one()
+		if d == null and continuous_refill() and not state.discard.is_empty():
+			_reshuffle()  # `refill_mode` continuous: draw the rest, shuffle, keep drawing
+			d = _draw_one()
 		if d == null:
 			break
 		state.hand.append(d)
+	if str(state.balance.get("redraw_scope", "round")) != "floor" or state.floor_round == 1:
+		state.redraws_this_round = 0  # `redraw_scope`: the redraw limit counts per round or per floor
 	state.phase = Phase.PLAY
 	_emit(Ev.HAND_FILLED, {"hand": _labels(state.hand), "ids": _ids(state.hand)})
+
+
+## Hand size this floor. With `hand_per_deck` > 0 a bigger deck holds a bigger hand:
+## at least deck size ÷ hand_per_deck (rounded down).
+func hand_limit() -> int:
+	# `face_from`: the first floor whose cards demand tribute (a smaller hand); 11 = Jack.
+	var face_from := int(state.balance.get("face_from", 11))
+	var limit := int(state.balance["face_hand_size"] if state.floor_num >= face_from else state.balance["hand_size"])
+	var per := int(state.balance.get("hand_per_deck", 0))
+	if per > 0:
+		limit = maxi(limit, state.deck.size() / per)
+	return limit
 
 
 ## Draws the top card of the draw pile, or null when it is empty. The discard pile is shuffled back
@@ -220,6 +243,12 @@ func _draw_one():
 	if state.draw_pile.is_empty():
 		return null
 	return state.draw_pile.pop_back()
+
+
+## `refill_mode` "continuous": when the draw pile runs out while you fill your hand, shuffle the
+## discard pile into a new draw pile and keep drawing ("empty", the default: only at an empty start).
+func continuous_refill() -> bool:
+	return str(state.balance.get("refill_mode", "empty")) == "continuous"
 
 
 func _reshuffle() -> void:
@@ -273,6 +302,8 @@ func playable_cards() -> Array:
 
 
 func retain_limit() -> int:
+	if keep_hand() and hand_max() > 0:
+		return hand_max()
 	return mod.modify_retain(int(state.balance["retain"]))
 
 
@@ -299,6 +330,8 @@ func preview_enemies() -> Array:
 ## Value of a burned card: double its rank ("double") or its rank in the other colour ("swap").
 ## Only the number counts: no suit effects.
 func burn_value(c) -> int:
+	if burn_mode() == "dig":
+		return 0
 	return c.rank * (2 if burn_mode() == "double" else 1)
 
 
@@ -331,9 +364,33 @@ func _attack_val(c) -> int:
 		return burn_value(c)
 	if _plain(c):
 		return c.rank
-	if c.suit == "S":
+	if c.suit == "S" and str(state.balance.get("spade_mode", "mult")) == "mult":
 		return int(floor(c.value() * float(state.balance["spade_multiplier"])))
 	return c.value()
+
+
+## Attack total of the black cards played this round, with the suit synergies:
+## ♣ `club_mode` "pair": +club_pair_bonus with 2+ clubs; "swarm": +club_swarm_bonus per club with 2+ clubs.
+## ♠ `spade_mode` "mult": × spade_multiplier each; "lone": a ♠ that is your only attack card counts
+## × spade_lone_mult (an integer), otherwise just its rank.
+func _black_total(blacks: Array) -> int:
+	var b := state.balance
+	var atk := 0
+	var clubs := 0
+	for c in blacks:
+		atk += _attack_val(c)
+		if c.suit == "C" and not _plain(c):
+			clubs += 1
+	if clubs >= 2:
+		if str(b.get("club_mode", "pair")) == "swarm":
+			atk += clubs * int(b.get("club_swarm_bonus", 1))
+		else:
+			atk += int(b["club_pair_bonus"])
+	if str(b.get("spade_mode", "mult")) == "lone" and blacks.size() == 1:
+		var c = blacks[0]
+		if c.suit == "S" and not _plain(c):
+			atk = c.rank * int(b.get("spade_lone_mult", 2))
+	return atk
 
 
 ## Totals for a set of played cards (used for the live counter and for resolution).
@@ -354,18 +411,11 @@ func compute(cards: Array) -> Dictionary:
 		block += _block_val(c)
 		if c.suit == "H" and not _plain(c):
 			hearts += _block_val(c)
-	var attack := 0
-	var clubs := 0
-	for c in blacks:
-		attack += _attack_val(c)
-		if c.suit == "C" and not _plain(c):
-			clubs += 1
-	if clubs >= 2:
-		attack += int(state.balance["club_pair_bonus"])
+	var attack := _black_total(blacks)
 	if not blacks.is_empty():
 		attack = mod.modify_player_attack(attack)
 	return {"block": block, "attack": attack, "block_need": bneed, "attack_need": aneed,
-		"hearts": hearts, "carry": carry, "block_cards": reds, "attack_cards": blacks}
+		"hearts": hearts, "carry": carry, "carry_all": state.carry_shield, "block_cards": reds, "attack_cards": blacks}
 
 
 ## Attack value of the black cards among `cards` if they overpower the revealed attack, else 0.
@@ -376,21 +426,21 @@ func overpower_value(cards: Array) -> int:
 	var blacks: Array = cards.filter(func(c): return not counts_red(c))
 	if blacks.is_empty():
 		return 0
-	var atk := 0
-	var clubs := 0
-	for c in blacks:
-		atk += _attack_val(c)
-		if c.suit == "C" and not _plain(c):
-			clubs += 1
-	if clubs >= 2:
-		atk += int(state.balance["club_pair_bonus"])
-	atk = mod.modify_player_attack(atk)
+	var atk := mod.modify_player_attack(_black_total(blacks))
 	return atk if atk >= mult * block_need() else 0
 
 
 ## Reward rules for finishing a floor on `suit` (with the mod applied), for the "last card" tip.
 func reward_rules(suit: String) -> Dictionary:
 	var r := {"suit": suit, "heal": 0, "picks": 1, "reveal": 2, "remove": false, "all": false}
+	if str(state.balance.get("reward_mode", "suit")) == "camp":
+		# Camp: the finishing suit doesn't matter. Take 1 of the beaten cards (`camp_reveal` of them
+		# revealed, 0 = all), or rest, or trim (see trim()).
+		var n := int(state.balance.get("camp_reveal", 0))
+		r["all"] = n <= 0
+		r["reveal"] = n
+		mod.modify_reward(r)
+		return r
 	match suit:
 		"S": r["all"] = true
 		"C": r["remove"] = true
@@ -467,6 +517,8 @@ func _diamond_draws() -> bool:
 			return block_need() > 0
 		"once":
 			return state.diamond_draws == 0
+		"off":
+			return false
 	return true
 
 
@@ -505,6 +557,14 @@ func _do_burn_card(card_id: int) -> bool:
 		return false
 	state.hand.erase(c)
 	state.deck.erase(c)
+	if burn_mode() == "dig":
+		# Dig: the card goes back in the box and you draw `burn_draw` cards instead (no value).
+		c.burned = true
+		state.burns_this_round += 1
+		state.burned_total += 1
+		_emit(Ev.CARD_BURNED, {"card": c.label(), "id": c.id, "value": 0, "colour": "none", "deck": state.deck.size()})
+		_draw_now(int(state.balance.get("burn_draw", 2)))
+		return true
 	c.burned = true
 	state.played.append(c)
 	state.burns_this_round += 1
@@ -514,6 +574,44 @@ func _do_burn_card(card_id: int) -> bool:
 	_emit(Ev.CARD_BURNED, {"card": c.label(), "id": c.id, "value": burn_value(c),
 		"colour": "red" if counts_red(c) else "black", "deck": state.deck.size()})
 	_draw_now(_check_overpower())
+	return true
+
+
+## Redraw (mulligan): `redraw_limit` times per round or per floor (`redraw_scope`; 0 = off), before
+## you play any card, set aside any cards from your hand, draw that many minus `redraw_cost`, then
+## discard the set-aside cards.
+func can_redraw() -> bool:
+	var lim := int(state.balance.get("redraw_limit", 0))
+	return state.phase == Phase.PLAY and lim > 0 and state.redraws_this_round < lim and state.played.is_empty()
+
+
+func redraw(ids: Array) -> bool:
+	return _act("redraw", [ids])
+
+
+func _do_redraw(ids: Array) -> bool:
+	if not can_redraw() or ids.is_empty():
+		return false
+	var cards: Array = []
+	for id in ids:
+		var c = state.find_in(state.hand, id)
+		if c == null or cards.has(c):
+			return false
+		cards.append(c)
+	for c in cards:
+		state.hand.erase(c)
+		_emit(Ev.CARD_DISCARDED, {"card": c.label(), "id": c.id})
+	state.redraws_this_round += 1
+	var n := maxi(0, cards.size() - int(state.balance.get("redraw_cost", 0)))
+	for i in n:
+		if state.draw_pile.is_empty() and continuous_refill() and not state.discard.is_empty():
+			_reshuffle()
+		var d = _draw_one()
+		if d == null:
+			break
+		state.hand.append(d)
+		_emit(Ev.CARD_DRAWN, {"card": d.label(), "id": d.id})
+	state.discard.append_array(cards)
 	return true
 
 
@@ -575,10 +673,14 @@ func _do_resolve() -> bool:
 			_emit(Ev.BLOCKED, {"block": blk, "attack": bneed, "exact": blk == bneed})
 			if blk == bneed:
 				_perfect("block")
-			new_carry = mini(blk - bneed, t["hearts"])
+			if _heart_wall():
+				# Wall: unused stored shield and the hearts' leftover stay stored (up to the cap).
+				new_carry = mini(mini(blk - bneed, int(t["hearts"]) + int(t["carry"])), _wall_cap())
+			else:
+				new_carry = mini(blk - bneed, t["hearts"])
 		else:
 			var miss := bneed - blk
-			var dmg := 2 if miss >= int(b["graded_threshold"]) else 1
+			var dmg := miss_lives(miss)
 			_emit(Ev.DAMAGE_TAKEN, {"block": blk, "attack": bneed, "miss": miss, "lives": dmg})
 			if _lose_lives(dmg, "damage"):
 				return true
@@ -595,9 +697,14 @@ func _do_resolve() -> bool:
 		if new_carry > 0:
 			_emit(Ev.SHIELD_STORED, {"amount": new_carry})
 	elif int(t["hearts"]) > 0:
-		# ♥ played with no attack to block: the whole heart value is stored (replaces older shield).
+		# ♥ played with no attack to block: the whole heart value is stored (replaces older shield;
+		# a wall adds to it, up to the cap).
 		state.carry_shield = int(t["hearts"])
+		if _heart_wall():
+			state.carry_shield = mini(state.carry_shield + int(t["carry_all"]), _wall_cap())
 		_emit(Ev.SHIELD_STORED, {"amount": state.carry_shield})
+	elif _heart_wall():
+		pass  # a wall keeps its stored shield until an attack uses it
 	elif b["heart_carry_mode"] == "next_round":
 		state.carry_shield = 0
 	if aneed > 0:
@@ -610,17 +717,39 @@ func _do_resolve() -> bool:
 			for e in shields:
 				_beat(e, _last_counting(state.played, t["attack_cards"]))
 		else:
-			# Not broken: the shield goes to the bottom of the enemy pile and comes back.
+			# Not broken. `failed_shield`: "return" = it goes to the bottom of the enemy pile and comes
+			# back; "wound" = it costs lives like a missed attack and is beaten anyway; "second" = the
+			# first time it goes to the bottom turned sideways, a sideways shield that fails is a wound.
 			_emit(Ev.ATTACK_FAILED, {"attack": atk, "shield": aneed})
-			for e in shields:
-				state.enemy_pile.append(e)
+			var mode := failed_shield_mode()
+			var wound := mode == "wound"
+			if mode == "second":
+				for e in shields:
+					if e.turned:
+						wound = true
+			if wound:
+				var miss := aneed - atk
+				var dmg := miss_lives(miss)
+				_emit(Ev.DAMAGE_TAKEN, {"block": atk, "attack": aneed, "miss": miss, "lives": dmg})
+				if _lose_lives(dmg, "damage"):
+					return true
+				for e in shields:
+					_beat(e, null)
+			else:
+				for e in shields:
+					e.turned = true
+					state.enemy_pile.append(e)
 	for c in state.played:
 		if not c.temp and not c.burned:
 			state.discard.append(c)
 	state.played = []
 	state.current = []
 	if keep_hand():
-		# Unplayed cards stay in hand; draw back up to the hand size next round.
+		# Unplayed cards stay in hand; draw back up to the hand size next round. With `hand_max`,
+		# a bigger hand is discarded down to that many (your choice) before the next round.
+		if hand_max() > 0 and state.hand.size() > hand_max() and not state.enemy_pile.is_empty():
+			state.phase = Phase.RETAIN
+			return true
 		_next_round()
 		return true
 	state.phase = Phase.RETAIN
@@ -630,9 +759,39 @@ func _do_resolve() -> bool:
 	return true
 
 
+## What happens to a shield you fail to break: "return", "wound" or "second" (see _do_resolve).
+func failed_shield_mode() -> String:
+	return str(state.balance.get("failed_shield", "return"))
+
+
+## A miss of `graded_threshold` or more costs 2 lives, a smaller one 1 (threshold 0 = always 1).
+func graded_threshold() -> int:
+	var g := int(state.balance.get("graded_threshold", 0))
+	return g if g > 0 else 1 << 20
+
+
+func miss_lives(miss: int) -> int:
+	return 2 if miss >= graded_threshold() else 1
+
+
+## ♥ `heart_mode` "wall": stored shield lasts until an attack uses it and grows, up to the cap.
+func _heart_wall() -> bool:
+	return str(state.balance.get("heart_mode", "carry")) == "wall"
+
+
+## Most shield a wall can store: `heart_wall_cap`, 0 = the floor's rank.
+func _wall_cap() -> int:
+	var cap := int(state.balance.get("heart_wall_cap", 0))
+	return cap if cap > 0 else state.floor_num
+
+
 ## True when unplayed cards stay in hand between rounds (no discard, no keep step).
 func keep_hand() -> bool:
 	return bool(state.balance.get("keep_hand", false))
+
+
+func hand_max() -> int:
+	return int(state.balance.get("hand_max", 0))
 
 
 func retain(ids: Array) -> bool:
@@ -655,6 +814,9 @@ func _do_retain(ids: Array) -> bool:
 			state.discard.append(c)
 	state.hand = []
 	state.retained = keep
+	if keep_hand():
+		state.hand = keep  # hand_max: discarded down, the rest stays in hand
+		state.retained = []
 	_emit(Ev.RETAINED, {"cards": _labels(keep), "ids": _ids(keep)})
 	_next_round()
 	return true
@@ -732,8 +894,35 @@ func _floor_cleared() -> void:
 		pool.append(_new_card(c.rank, c.suit))
 	rng.shuffle(pool)
 	var suit: String = last.suit if last and Card.SUITS.has(last.suit) else "S"
+	if menu_rewards():
+		_offer_menu(pool, suit)
+		return
+	# `reward_mode` "choice": choose the reward of your finishing card's suit or of the beaten enemy card's suit.
+	var esuit: String = state.last_beaten.suit if state.last_beaten else suit
+	if str(state.balance.get("reward_mode", "suit")) == "choice" and esuit != suit:
+		state.reward = {"choose": [suit, esuit], "pool": pool, "suit": suit, "options": [], "picks": 0}
+		state.phase = Phase.REWARD
+		_emit(Ev.REWARD_OFFERED, {"suit": suit, "choose": [suit, esuit], "options": [], "ids": [],
+			"picks": 0, "remove": false, "healed": 0, "pool": pool.size()})
+		return
+	_offer_suit_reward(pool, suit)
+
+
+## Reward choice: take the reward of `suit` (one of the two offered suits).
+func reward_suit(suit: String) -> bool:
+	return _act("reward_suit", [suit])
+
+
+func _do_reward_suit(suit: String) -> bool:
+	if state.phase != Phase.REWARD or not state.reward.has("choose") or not state.reward["choose"].has(suit):
+		return false
+	_offer_suit_reward(state.reward["pool"], suit)
+	return true
+
+
+func _offer_suit_reward(pool: Array, suit: String) -> void:
 	var r := reward_rules(suit)
-	if suit == "H" and state.lost_lives.is_empty():
+	if suit == "H" and (state.lost_lives.is_empty() or not bool(state.balance.get("heart_heal", true))):
 		r["heal"] = 0
 	var healed := 0
 	while healed < int(r["heal"]) and not state.lost_lives.is_empty():
@@ -751,6 +940,96 @@ func _floor_cleared() -> void:
 	_emit(Ev.REWARD_OFFERED, {"suit": suit, "options": _labels(options), "ids": _ids(options),
 		"picks": r["picks"], "remove": r["remove"], "healed": healed, "pool": pool.size()})
 	_after_pick()
+
+
+# ---- reward menu (`reward_mode` "menu"): instead of the finishing suit, choose one of
+#   take  - add up to `menu_take` of the floor's beaten cards
+#   trade - add up to 1 beaten card and remove 1 card from your deck
+#   cull  - remove up to `menu_cull` cards from your deck
+#   heal  - get one lost life back
+
+func menu_rewards() -> bool:
+	return str(state.balance.get("reward_mode", "suit")) == "menu"
+
+
+func _offer_menu(pool: Array, suit: String) -> void:
+	# `reward_max_rank` > 0: higher cards (the face cards) are never added to your deck.
+	var top := int(state.balance.get("reward_max_rank", 0))
+	if top > 0:
+		pool = pool.filter(func(c): return c.rank <= top)
+	var r := {"suit": suit, "menu": true, "heal": 0, "picks": int(state.balance.get("menu_take", 2)),
+		"cull": int(state.balance.get("menu_cull", 2)), "remove": false, "all": true, "reveal": pool.size()}
+	mod.modify_menu(r)
+	r["options"] = pool
+	state.reward = r
+	state.phase = Phase.REWARD
+	_emit(Ev.REWARD_OFFERED, {"suit": suit, "options": _labels(pool), "ids": _ids(pool),
+		"picks": r["picks"], "remove": false, "healed": 0, "pool": pool.size(), "menu": true})
+
+
+func menu_can(kind: String) -> bool:
+	if state.phase != Phase.REWARD or not state.reward.get("menu", false):
+		return false
+	match kind:
+		"take", "trade":
+			return not state.reward.get("options", []).is_empty()
+		"cull":
+			return state.deck.size() > int(state.balance["deck_min"])
+		"heal":
+			return not state.lost_lives.is_empty()
+	return false
+
+
+func reward_menu(kind: String, take_ids: Array = [], remove_ids: Array = []) -> bool:
+	return _act("reward_menu", [kind, take_ids, remove_ids])
+
+
+func _do_reward_menu(kind: String, take_ids: Array = [], remove_ids: Array = []) -> bool:
+	if not menu_can(kind):
+		return false
+	var r: Dictionary = state.reward
+	var opts: Array = r["options"]
+	var max_take := 0
+	var max_remove := 0
+	match kind:
+		"take":
+			max_take = int(r["picks"])
+		"trade":
+			max_take = 1
+			max_remove = 1
+		"cull":
+			max_remove = int(r["cull"])
+	var takes: Array = []
+	for id in take_ids:
+		var c = state.find_in(opts, id)
+		if c == null or takes.has(c):
+			return false
+		takes.append(c)
+	var rems: Array = []
+	for id in remove_ids:
+		var c = state.find_in(state.deck, id)
+		if c == null or rems.has(c):
+			return false
+		rems.append(c)
+	if takes.size() > max_take or rems.size() > max_remove:
+		return false
+	if not rems.is_empty() and state.deck.size() + takes.size() - rems.size() < int(state.balance["deck_min"]):
+		return false
+	if kind == "heal":
+		var a = state.lost_lives.pop_back()
+		state.lives.append(a)
+		_emit(Ev.LIFE_RESTORED, {"card": a.label(), "id": a.id, "lives": state.lives.size()})
+	for c in takes:
+		state.deck.append(c)
+		opts.erase(c)
+		_emit(Ev.REWARD_TAKEN, {"card": c.label(), "id": c.id, "replaced": "", "replaced_id": -1})
+	for c in rems:
+		state.deck.erase(c)
+		_emit(Ev.CARD_REMOVED, {"card": c.label(), "id": c.id})
+	if takes.is_empty() and kind != "heal":
+		_emit(Ev.REWARD_SKIPPED, {})
+	_finish_reward()
+	return true
 
 
 ## deck_cap 0 = no cap.
@@ -832,6 +1111,10 @@ func reward_resolve(take_ids: Array, remove_id: int = -1, replace_ids: Array = [
 func _do_reward_resolve(take_ids: Array, remove_id: int = -1, replace_ids: Array = []) -> bool:
 	if state.phase != Phase.REWARD:
 		return false
+	if state.reward.has("choose"):
+		return false  # choose the suit first (reward_suit)
+	if state.reward.get("menu", false):
+		return _do_reward_menu("take" if remove_id < 0 else "trade", take_ids, [] if remove_id < 0 else [remove_id])
 	var r: Dictionary = state.reward
 	var opts: Array = r["options"]
 	var picks := mini(int(r["picks"]), opts.size())
@@ -875,6 +1158,51 @@ func _do_reward_resolve(take_ids: Array, remove_id: int = -1, replace_ids: Array
 	if removed != null:
 		state.deck.erase(removed)
 		_emit(Ev.CARD_REMOVED, {"card": removed.label(), "id": removed.id})
+	_finish_reward()
+	return true
+
+
+## Rest (`rest_heal`): instead of the floor's reward, get one lost life back.
+func can_rest() -> bool:
+	return bool(state.balance.get("rest_heal", false)) and not state.lost_lives.is_empty() \
+		and (state.phase == Phase.REWARD or state.phase == Phase.REWARD_REMOVE)
+
+
+func rest() -> bool:
+	return _act("rest", [])
+
+
+func _do_rest() -> bool:
+	if not can_rest():
+		return false
+	var a = state.lost_lives.pop_back()
+	state.lives.append(a)
+	_emit(Ev.LIFE_RESTORED, {"card": a.label(), "id": a.id, "lives": state.lives.size()})
+	state.reward["picks"] = 0
+	_emit(Ev.REWARD_SKIPPED, {})
+	_finish_reward()
+	return true
+
+
+## Trim (`reward_mode` "camp"): instead of the floor's reward, remove a card from your deck for good.
+func can_trim() -> bool:
+	return str(state.balance.get("reward_mode", "suit")) == "camp" and state.phase == Phase.REWARD \
+		and state.deck.size() > int(state.balance["deck_min"])
+
+
+func trim(card_id: int) -> bool:
+	return _act("trim", [card_id])
+
+
+func _do_trim(card_id: int) -> bool:
+	if not can_trim():
+		return false
+	var c = state.find_in(state.deck, card_id)
+	if c == null:
+		return false
+	state.deck.erase(c)
+	_emit(Ev.CARD_REMOVED, {"card": c.label(), "id": c.id})
+	state.reward["picks"] = 0
 	_finish_reward()
 	return true
 

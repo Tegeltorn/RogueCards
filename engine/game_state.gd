@@ -42,6 +42,7 @@ var setup_picks: int = 0     # how many of setup_options may still be taken
 var reward: Dictionary = {}  # {suit, heal, picks, reveal, remove, options:[Card]}
 var burns_this_round: int = 0
 var diamond_draws: int = 0   # ♦ draws this round
+var redraws_this_round: int = 0
 var skip_refill := false   # burned last round: no hand refill this round
 var burned_total: int = 0
 

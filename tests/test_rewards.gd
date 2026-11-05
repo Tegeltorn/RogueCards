@@ -158,3 +158,31 @@ func test_reward_resolve_diamonds_both_at_once() -> void:
 	var ids: Array = e.state.reward["options"].map(func(c): return c.id)
 	check(e.reward_resolve(ids), "take both")
 	eq(e.state.deck.size(), 5, "deck grew by two")
+
+
+func test_rest_heals_instead_of_reward() -> void:
+	var e := scenario(["5D"], ["3S"], {"rest_heal": true, "heart_heal": false})
+	var s := e.state
+	s.deck = cards(e, ["2H", "2D", "2S", "2C"])
+	s.beaten = cards(e, ["3H", "3C"])
+	s.lost_lives.append(s.lives.pop_back())
+	e.play_cards([s.hand[0].id])
+	e.resolve()
+	eq(s.phase, Phase.REWARD, "reward offered")
+	check(e.can_rest(), "may rest with a lost life")
+	check(e.rest(), "rest")
+	eq(s.lives.size(), 3, "life back")
+	eq(s.deck.size(), 4, "no card taken")
+	eq(s.floor_num, 5, "next floor")
+
+
+func test_camp_offers_any_beaten_card_or_trim() -> void:
+	var e := _clear_with("14D", ["2H", "2D", "2S", "2C", "3C"], {"reward_mode": "camp"}, ["3H", "3C", "3D"])
+	var s := e.state
+	eq(s.reward["options"].size(), 4, "every beaten card is offered")
+	eq(int(s.reward["picks"]), 1, "take one")
+	check(e.can_trim(), "may trim instead")
+	var low = s.deck[0]
+	check(e.trim(low.id), "trim")
+	check(not s.deck.has(low), "card removed")
+	eq(s.deck.size(), 4, "nothing taken")

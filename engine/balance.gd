@@ -5,9 +5,10 @@ const BALANCE_PATH := "res://config/balance.json"
 const MODS_PATH := "res://config/mods.json"
 
 const INT_KEYS := ["first_floor", "start_pick_rank", "start_pick_offer", "start_pick_take", "start_random", "hand_size", "face_hand_size", "retain", "deck_cap", "deck_min", "lives",
-	"graded_threshold", "club_pair_bonus", "overpower_multiplier", "overpower_draw", "perfect_draw", "min_draw", "ace_value", "burn_limit", "burn_min_deck"]
+	"graded_threshold", "club_pair_bonus", "overpower_multiplier", "overpower_draw", "perfect_draw", "min_draw", "ace_value", "burn_limit", "burn_min_deck", "burn_draw", "redraw_limit", "redraw_cost", "draw_per_turn", "hand_max",
+	"club_swarm_bonus", "spade_lone_mult", "heart_wall_cap", "menu_take", "menu_cull", "hand_per_deck", "reward_max_rank", "face_from"]
 const BOOL_KEYS := ["keep_hand", "reward_optional", "free_discard", "ace_sac_enabled", "ace_sac_suit_effects",
-	"mods_enabled", "failed_attack_returns", "burn_no_refill"]
+	"mods_enabled", "failed_attack_returns", "burn_no_refill", "rest_heal", "heart_heal"]
 
 static var _cache: Dictionary = {}
 static var mods_path := MODS_PATH  # the simulator can point this at an alternate mods file
@@ -44,10 +45,13 @@ static func normalise(b: Dictionary) -> Dictionary:
 		if b.has(k):
 			b[k] = bool(b[k])
 	b["spade_multiplier"] = float(b.get("spade_multiplier", 1.5))
-	b["lives"] = clampi(int(b.get("lives", 3)), 1, 3)  # lives are physical aces: max 3
-	if not ["double", "swap", "off"].has(str(b.get("burn_mode", "off"))):
+	# Lives are physical aces: max 3, or 4 when there is no mod ace.
+	b["lives"] = clampi(int(b.get("lives", 3)), 1, 3 if bool(b.get("mods_enabled", true)) else 4)
+	if not ["double", "swap", "dig", "off"].has(str(b.get("burn_mode", "off"))):
 		b["burn_mode"] = "off"
 	b["burn_mode"] = str(b.get("burn_mode", "off"))
+	if not ["empty", "continuous"].has(str(b.get("refill_mode", "empty"))):
+		b["refill_mode"] = "empty"
 	if not b.has("heart_carry_mode"):
 		b["heart_carry_mode"] = "next_round"
 	return b

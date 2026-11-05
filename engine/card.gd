@@ -9,6 +9,7 @@ var id: int = 0
 var rank: int = 0
 var suit: String = ""      # "H", "D", "S" or "C"
 var temp: bool = false     # sacrificed ace: never enters the deck/discard
+var turned: bool = false   # enemy shield that already failed once (failed_shield "second")
 var burned: bool = false   # burned this round: gone from the deck for good, counts with its burn value
 
 

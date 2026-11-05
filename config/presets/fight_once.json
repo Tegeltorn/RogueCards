@@ -1,0 +1,17 @@
+{
+  "_note": "Prototype 'Fight once + camp' (analysis D): every enemy card is fought once (a miss costs 1 life, the card is beaten anyway); after each floor take one beaten card, or one life back, or remove a card. Use with sim/run_sim.gd --preset res://config/presets/fight_once.json",
+  "hand_size": 4,
+  "face_hand_size": 3,
+  "lives": 4,
+  "mods_enabled": false,
+  "failed_attack_returns": false,
+  "failed_shield": "wound",
+  "graded_threshold": 0,
+  "ace_sac_enabled": false,
+  "perfect_draw": 0,
+  "overpower_multiplier": 0,
+  "club_pair_bonus": 0,
+  "reward_mode": "camp",
+  "rest_heal": true,
+  "heart_heal": false
+}

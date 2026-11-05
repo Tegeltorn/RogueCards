@@ -11,6 +11,7 @@ const EXACT_BONUS := 25  # cost units (10 per card value point) a perfect hit is
 const BURN_COST := 30    # extra cost units for burning a card (it leaves the deck for good)
 const STUCK_ROUNDS := 80  # a floor this long means the run is stuck (an unbreakable shield): give up
 const Phase := GameState.Phase
+const REST_AT := 1  # rest (heal instead of a reward) at this many lives or fewer
 
 
 ## Advance the engine by one decision. Returns false when the run is over.
@@ -53,16 +54,62 @@ func play_run(e) -> void:
 func _play(e) -> void:
 	if e.keep_hand():
 		_play_thrifty(e)
+	elif int(e.state.balance.get("retain", 0)) > 0 or e.continuous_refill():
+		_play_thrifty(e, true)
 	else:
 		_play_all(e)
+
+
+## Redraw (mulligan) before playing: when the hand can't beat the enemy card, throw the cards that
+## don't count against it (and the low ones of the right colour) and draw new ones.
+func _maybe_redraw(e) -> void:
+	var s = e.state
+	if not e.can_redraw() or s.hand.is_empty():
+		return
+	if str(s.balance.get("redraw_scope", "round")) == "floor" and e.block_need() <= 0:
+		return  # a scarce redraw is kept for attacks (a missed shield only costs a round)
+	if not _cheapest_plan(e, true, _burns_left(e)).is_empty():
+		return
+	var avg := _deck_avg(s)
+	var toss: Array = []
+	for c in s.hand:
+		if not e.is_effective(c) or c.value() < avg:
+			toss.append(c)
+	if toss.is_empty():
+		return
+	var spare: int = s.draw_pile.size() + (s.discard.size() if e.continuous_refill() else 0)
+	if spare <= 0:
+		return
+	e.redraw(_ids(toss.slice(0, spare)))
+
+
+## Dig burn: when the hand can't do the job, burn the weakest card that doesn't count (or the
+## weakest card) for `burn_draw` new ones. Returns true if it burned.
+func _dig_burn(e) -> bool:
+	var s = e.state
+	if e.burn_mode() != "dig" or not e.can_burn() or s.draw_pile.is_empty():
+		return false
+	var cands: Array = s.hand.filter(func(c): return _can_spare(e, c, []))
+	if cands.is_empty():
+		return false
+	cands.sort_custom(func(a, b):
+		var ea: bool = e.is_effective(a)
+		var eb: bool = e.is_effective(b)
+		if ea != eb:
+			return not ea
+		return a.value() < b.value())
+	if cands[0].value() > _deck_avg(s) + 1:
+		return false  # never burn a good card
+	return e.burn_card(cands[0].id)
 
 
 ## Cards stay in hand between rounds: play the cheapest set that does the job, ♦ first (they draw),
 ## save the rest. Burn a card only when nothing else does the job. If the enemy can't be stopped,
 ## only play enough to avoid the 2-life miss.
-func _play_thrifty(e) -> void:
+func _play_thrifty(e, fresh := false) -> void:
 	var s = e.state
-	var graded := int(s.balance["graded_threshold"])
+	var graded: int = e.graded_threshold()
+	_maybe_redraw(e)
 	for _guard in 16:
 		var bneed: int = e.block_need()
 		var aneed: int = e.attack_need()
@@ -82,8 +129,10 @@ func _play_thrifty(e) -> void:
 			if not dias.is_empty() and not s.draw_pile.is_empty() and e._diamond_draws():
 				e.play_cards([dias[0].id])  # ♦ draws while the draw pile has cards
 				continue
+			if _dig_burn(e):
+				continue
 			plan = _cheapest_plan(e, true, _burns_left(e))
-			if plan.is_empty() and short_block:
+			if plan.is_empty() and (short_block or _shield_wounds(e)):
 				plan = _cheapest_plan(e, false, _burns_left(e))
 		if plan.is_empty():
 			break
@@ -103,8 +152,15 @@ func _play_thrifty(e) -> void:
 	# A shield it can't break goes to the bottom and comes back: cycle the hand (play everything,
 	# ♥ store shield, ♦ draw) so the next try starts from fresh cards instead of the same ones.
 	var aneed2: int = e.attack_need()
-	if aneed2 > 0 and int(e.compute(s.played)["attack"]) < aneed2 and not s.hand.is_empty():
-		e.play_cards(_ids(s.hand))
+	if aneed2 > 0 and int(e.compute(s.played)["attack"]) < aneed2:
+		if not _shield_wounds(e):
+			if not s.hand.is_empty():
+				e.play_cards(_ids(s.hand))
+		elif aneed2 - int(e.compute(s.played)["attack"]) >= graded:
+			for a in e.sacrificable_aces():
+				if a.base_black():
+					e.sacrifice_ace(a.id)
+					break
 	var need: int = e.block_need()
 	if need > 0:
 		var miss: int = need - int(e.compute(s.played)["block"])
@@ -115,6 +171,18 @@ func _play_thrifty(e) -> void:
 				if a.base_red():
 					e.sacrifice_ace(a.id)
 					break
+	# Fresh hands: unplayed cards are discarded anyway, so play the leftover ♥ (stored shield)
+	# and ♦ (a draw while it still draws), keeping the best card for the keep step.
+	if fresh:
+		var keep_n: int = e.retain_limit()
+		var rest: Array = s.hand.duplicate()
+		rest.sort_custom(func(a, b): return a.value() > b.value())
+		var extra: Array = []
+		for c in rest.slice(keep_n):
+			if c.suit == "H":
+				extra.append(c)
+		if not extra.is_empty():
+			e.play_cards(_ids(extra))
 	# Free discard: drop below-average unplayed cards so the refill can bring better ones.
 	if e.can_discard():
 		var avg := _deck_avg(s)
@@ -126,7 +194,7 @@ func _play_thrifty(e) -> void:
 
 ## How many cards the bot may still burn this round (an unlimited burn is capped at 2 per plan).
 static func _burns_left(e) -> int:
-	if not e.can_burn():
+	if not e.can_burn() or e.burn_mode() == "dig":
 		return 0
 	var lim := int(e.state.balance.get("burn_limit", 0))
 	var left: int = 2 if lim <= 0 else lim - int(e.state.burns_this_round)
@@ -205,7 +273,7 @@ static func _plan_cost(e, play: Array, burn: Array, cost: int, full: bool) -> in
 	if full:
 		ok = int(t["block"]) >= bneed and int(t["attack"]) >= aneed
 	else:
-		ok = bneed - int(t["block"]) < int(s.balance["graded_threshold"])
+		ok = maxi(bneed - int(t["block"]), aneed - int(t["attack"])) < int(e.graded_threshold())
 	if not ok:
 		return -1
 	if full and int(s.balance.get("perfect_draw", 0)) > 0:
@@ -229,7 +297,7 @@ func _play_all(e) -> void:
 	if need > 0:
 		var t: Dictionary = e.compute(e.state.played)
 		var miss: int = need - int(t["block"])
-		if miss >= int(e.state.balance["graded_threshold"]) or (miss > 0 and bool(e.state.balance.get("failed_attack_returns", false))):
+		if miss >= int(e.graded_threshold()) or (miss > 0 and bool(e.state.balance.get("failed_attack_returns", false))):
 			for a in e.sacrificable_aces():
 				if a.base_red():
 					e.sacrifice_ace(a.id)
@@ -237,13 +305,40 @@ func _play_all(e) -> void:
 	e.resolve()
 
 
+## True when failing the revealed shield costs lives (failed_shield "wound", or "second" on a turned shield).
+static func _shield_wounds(e) -> bool:
+	if e.attack_need() <= 0 or not e.has_method("failed_shield_mode"):
+		return false
+	match e.failed_shield_mode():
+		"wound":
+			return true
+		"second":
+			for c in e.state.enemy_shield_cards():
+				if c.turned:
+					return true
+	return false
+
+
 func _reward(e) -> void:
 	var s = e.state
+	if s.reward.get("menu", false):
+		_reward_menu(e)
+		return
+	if s.reward.has("choose"):
+		e.reward_suit(_choose_suit(s, s.reward["choose"]))
+		return  # the chosen reward (or the next floor) is handled on the next step
+	if e.has_method("can_rest") and e.can_rest() and s.lives.size() <= int(s.balance.get("bot_rest_at", REST_AT)):
+		e.rest()
+		return
 	var opts: Array = s.reward["options"]
-	var c = opts[0] if s.reward["suit"] == "D" and int(s.reward["picks"]) >= 2 else _best(s, opts)
+	var c = opts[0] if s.reward["suit"] == "D" and int(s.reward["picks"]) >= 2 else _pick_from(s, s.deck, opts)
 	if not e.deck_full():
 		# Optional rewards: only add cards that raise the deck's average value.
 		if e.can_decline() and c.rank < _deck_avg(s):
+			# Camp: rather than nothing, thin the deck by its lowest card.
+			if e.has_method("can_trim") and e.can_trim() and _lowest(s.deck).value() < _deck_avg(s):
+				e.trim(_lowest(s.deck).id)
+				return
 			e.reward_decline(c.id)
 		else:
 			e.reward_take(c.id)
@@ -264,11 +359,102 @@ func _reward(e) -> void:
 		e.reward_decline(c.id)
 
 
+## Reward choice between two suits: heal on the last life, else ♣ (take 1, remove 1) once the deck
+## has cards to spare, else ♦ (take 2), else heal, else ♠ (pick any).
+func _choose_suit(s, suits: Array) -> String:
+	var order: Array = _suit_order(s)
+	for x in order:
+		if suits.has(x):
+			return x
+	return suits[0]
+
+
+func _suit_order(s) -> Array:
+	if s.lives.size() <= 1 and not s.lost_lives.is_empty():
+		return ["H", "C", "D", "S"]
+	if s.deck.size() >= MENU_THIN:
+		return ["C", "D", "H", "S"] if s.lost_lives.is_empty() else ["C", "H", "D", "S"]
+	return ["D", "C", "H", "S"] if s.lost_lives.is_empty() else ["D", "H", "C", "S"]
+
+
+## Reward menu: heal when on the last life, trade (add 1, remove the lowest) once the deck is big,
+## otherwise take the cards that raise the deck average; cull when nothing is worth taking.
+const MENU_THIN := 8  # deck size from which the bot trades instead of taking 2
+
+
+func _reward_menu(e) -> void:
+	var s = e.state
+	var opts: Array = s.reward["options"]
+	var worth := _worth(s, opts)
+	if e.menu_can("heal") and (s.lives.size() <= 1 or (worth.is_empty() and s.lives.size() < s.max_lives)):
+		e.reward_menu("heal")
+		return
+	if worth.is_empty():
+		var cut := _lowest_n(s.deck, mini(int(s.reward["cull"]), s.deck.size() - int(s.balance["deck_min"])))
+		if not (e.menu_can("cull") and not cut.is_empty() and e.reward_menu("cull", [], _ids(cut))):
+			if not e.reward_menu("take"):
+				if not (e.menu_can("heal") and e.reward_menu("heal")):
+					e.reward_skip()
+		return
+	if s.deck.size() >= _thin_target() and e.menu_can("trade"):
+		var lows := _lowest_n(s.deck + [worth[0]], 1)
+		var low = lows[0] if not lows.is_empty() else worth[0]
+		if low != worth[0] and low.value() < worth[0].rank and e.reward_menu("trade", [worth[0].id], [low.id]):
+			return
+	if not e.reward_menu("take", _ids(worth.slice(0, int(s.reward["picks"])))):
+		e.reward_menu("take")
+
+
+func _thin_target() -> int:
+	return MENU_THIN
+
+
+## Reward options worth adding (rank above the deck average), best first.
+func _worth(s, opts: Array) -> Array:
+	var left: Array = opts.filter(func(c): return c.rank > _deck_avg(s))
+	var out: Array = []
+	var deck: Array = s.deck.duplicate()
+	while not left.is_empty():
+		var c = _pick_from(s, deck, left)
+		out.append(c)
+		left.erase(c)
+		deck.append(c)
+	return out
+
+
+## Which option the bot likes best given a (hypothetical) deck: archetype bots override this.
+func _pick_from(_s, deck: Array, opts: Array):
+	return _best_for(deck, opts)
+
+
+## The n lowest cards, never leaving fewer than BURN_KEEP cards of a colour.
+static func _lowest_n(deck: Array, n: int) -> Array:
+	var d: Array = deck.duplicate()
+	d.sort_custom(func(a, b): return a.value() < b.value())
+	var out: Array = []
+	var reds := deck.filter(func(c): return c.base_red()).size()
+	var blacks := deck.size() - reds
+	for c in d:
+		if out.size() >= n:
+			break
+		if c.base_red() and reds > BURN_KEEP:
+			reds -= 1
+			out.append(c)
+		elif not c.base_red() and blacks > BURN_KEEP:
+			blacks -= 1
+			out.append(c)
+	return out
+
+
 ## Prefer the colour with the lowest deck sum, then the highest rank (first max wins).
 static func _best(s, opts: Array):
+	return _best_for(s.deck, opts)
+
+
+static func _best_for(deck: Array, opts: Array):
 	var redv := 0
 	var blkv := 0
-	for d in s.deck:
+	for d in deck:
 		if d.is_red():
 			redv += d.value()
 		if d.is_black():

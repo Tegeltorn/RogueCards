@@ -1,0 +1,12 @@
+{
+  "_note": "Variant B (Reserve): opening hand 5 (3 on J/Q/K), draw 2 each later round, hand limit 5, continuous refill, no burn/overpower/perfect draw",
+  "keep_hand": true,
+  "hand_size": 5,
+  "face_hand_size": 3,
+  "draw_per_turn": 2,
+  "hand_max": 5,
+  "refill_mode": "continuous",
+  "burn_mode": "off",
+  "overpower_multiplier": 0,
+  "perfect_draw": 0
+}

@@ -42,6 +42,11 @@ func modify_reward(_reward: Dictionary) -> void:
 	pass
 
 
+## Reward menu dictionary: {picks (take option), cull, ...}. Mutate in place.
+func modify_menu(_reward: Dictionary) -> void:
+	pass
+
+
 func modify_retain(n: int) -> int:
 	return n
 

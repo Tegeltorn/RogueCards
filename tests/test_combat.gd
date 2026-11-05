@@ -382,3 +382,26 @@ func test_burned_card_sets_the_reward() -> void:
 	e.burn_card(e.state.hand[0].id)
 	e.resolve()
 	eq(e.state.reward.get("suit", ""), "H", "the burned 5♥ finished the floor")
+
+
+func test_failed_shield_wound_costs_a_life_and_is_beaten() -> void:
+	var e := scenario(["2S"], ["9H"], {"failed_shield": "wound", "graded_threshold": 0}, {"pile": ["5S"]})
+	e.play_cards([e.state.hand[0].id])
+	e.resolve()
+	eq(e.state.lives.size(), 2, "miss of 6 costs 1 life (graded off)")
+	check(has_event(e, Ev.ENEMY_DEFEATED), "shield beaten anyway")
+	eq(e.state.enemy_pile.size(), 0, "nothing goes back under")
+
+
+func test_failed_shield_second_try_wounds() -> void:
+	var e := scenario(["2S"], ["9H"], {"failed_shield": "second"}, {"pile": ["5S"]})
+	e.resolve()
+	eq(e.state.lives.size(), 3, "first failure is free")
+	eq(e.state.enemy_pile[-1].label(), "9♥", "goes to the bottom")
+	check(e.state.enemy_pile[-1].turned, "turned sideways")
+	e.state.current = [e.state.enemy_pile.pop_back()]
+	e.state.enemy_pile = cards(e, ["5S"])
+	e.state.phase = Phase.PLAY
+	e.resolve()
+	eq(e.state.lives.size(), 1, "second failure: miss of 9 costs 2 lives")
+	check(has_event(e, Ev.ENEMY_DEFEATED), "then it is beaten")

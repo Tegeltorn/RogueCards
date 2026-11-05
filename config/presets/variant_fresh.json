@@ -1,0 +1,11 @@
+{
+  "_note": "Variant A (Fresh hand): draw up to 4 every round, discard all but 1 unplayed card at end of turn, continuous refill, no burn/overpower/perfect draw",
+  "keep_hand": false,
+  "retain": 1,
+  "hand_size": 4,
+  "face_hand_size": 4,
+  "refill_mode": "continuous",
+  "burn_mode": "off",
+  "overpower_multiplier": 0,
+  "perfect_draw": 0
+}

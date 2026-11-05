@@ -10,3 +10,7 @@ func modify_reward(reward: Dictionary) -> void:
 	reward["reveal"] = int(reward["reveal"]) + int(params.get("reveal_bonus", 0))
 	if reward.get("suit", "") == "D" and params.has("diamond_picks"):
 		reward["picks"] = int(params["diamond_picks"])
+
+
+func modify_menu(reward: Dictionary) -> void:
+	reward["picks"] = int(reward["picks"]) + int(params.get("menu_take_bonus", 1))

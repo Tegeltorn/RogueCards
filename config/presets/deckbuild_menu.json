@@ -1,0 +1,10 @@
+{
+  "reward_mode": "menu",
+  "menu_take": 1,
+  "menu_cull": 2,
+  "deck_min": 6,
+  "club_mode": "swarm",
+  "club_swarm_bonus": 3,
+  "hand_per_deck": 4,
+  "ace_value": 12
+}

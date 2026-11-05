@@ -84,3 +84,10 @@ A test keeps these values in sync with `config/balance.json`.
 | `burn_limit` | 0 | Cards you may burn per round (0 = no limit) |
 | `burn_min_deck` | 5 | Cards your deck needs to burn one |
 | `burn_no_refill` | true | After a round you burned in, your hand is not refilled |
+| `burn_draw` | 2 | Cards drawn for a burned card (only with `burn_mode` `dig`: the burned card has no value) |
+| `refill_mode` | empty | `empty`: the discard pile is shuffled back only into an empty draw pile; `continuous`: when the draw pile runs out while you fill your hand, shuffle the discard pile and keep drawing |
+| `draw_per_turn` | 0 | 0 = fill up to the hand size; otherwise the floor's first hand is filled up to the hand size and every later round draws this many cards |
+| `hand_max` | 0 | Hand limit at the end of your turn when you keep your hand (discard down to it, your choice; 0 = none) |
+| `redraw_limit` | 0 | Redraws allowed (0 = off): before you play, discard any cards from your hand and draw as many |
+| `redraw_scope` | round | Whether `redraw_limit` counts per `round` or per `floor` |
+| `redraw_cost` | 0 | A redraw draws this many fewer cards than you discarded |

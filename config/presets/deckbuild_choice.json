@@ -1,0 +1,6 @@
+{
+  "reward_mode": "choice",
+  "club_mode": "swarm",
+  "club_swarm_bonus": 1,
+  "perfect_draw": 1
+}
