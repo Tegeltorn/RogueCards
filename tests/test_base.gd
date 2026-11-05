@@ -26,7 +26,7 @@ func eq(actual, expected, msg: String = "") -> void:
 ## (3 lives, overpower at 2× draws 1, deck minimum 4, burn from 5 cards) so they don't move with balance tuning.
 ## Card specs are strings like "7S", "12H", "2D".
 func scenario(hand: Array, enemies: Array, over: Dictionary = {}, opts: Dictionary = {}) -> GameEngine:
-	var b := {"mods_enabled": false, "lives": 3, "overpower_draw": 1, "overpower_multiplier": 2, "deck_min": 4, "burn_min_deck": 5}
+	var b := {"mods_enabled": false, "lives": 3, "overpower_draw": 1, "overpower_multiplier": 2, "deck_min": 4, "burn_min_deck": 5, "diamond_draw": "always"}
 	for k in over:
 		b[k] = over[k]
 	var e := GameEngine.new()

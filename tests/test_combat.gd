@@ -132,6 +132,20 @@ func test_diamond_draws_same_round() -> void:
 	check(has_event(e, Ev.BLOCKED), "3+6 blocks 9")
 
 
+func test_only_first_diamond_draws() -> void:
+	var e := scenario(["3D", "4D"], ["9S"], {"diamond_draw": "once"}, {"pile": ["5S"]})
+	e.state.draw_pile = cards(e, ["6H", "7H"])
+	e.play_cards([e.state.hand[0].id])
+	eq(e.state.hand.size(), 2, "first ♦ drew (4♦ + 7♥)")
+	e.play_cards([e.state.hand[0].id])
+	eq(e.state.hand.size(), 1, "second ♦ draws nothing")
+	e.resolve()
+	set_round(e, ["2D"], ["4S"], ["5S"])
+	e.state.draw_pile = cards(e, ["6H"])
+	e.play_cards([e.state.hand[0].id])
+	eq(e.state.hand.size(), 1, "a new round: ♦ draws again")
+
+
 func test_diamond_needs_cards_in_the_draw_pile() -> void:
 	var e := scenario(["3D"], ["9S"], {}, {"pile": ["5S"]})
 	e.state.discard = cards(e, ["4H"])

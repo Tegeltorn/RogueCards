@@ -8,12 +8,6 @@ const GameState := preload("res://engine/game_state.gd")
 const Ev := preload("res://engine/events.gd")
 const Phase := GameState.Phase
 
-const RULE_TEXT := {
-	"S": "Pick any of the beaten cards",
-	"C": "Reveal 2, take 1 and remove 1 card from your deck",
-	"H": "Get a life back (all lives: reveal 2, take 1)",
-	"D": "Reveal 2 and take both",
-}
 
 var main
 var _e
@@ -113,12 +107,12 @@ func refresh() -> void:
 		c.queue_free()
 	_opt_views.clear()
 	_deck_views.clear()
-	_title.text = "FLOOR %s CLEARED" % Style.floor_text(s.floor_num)
+	_title.text = ("%s FLOOR CLEARED" % Ev.floor_name(s.floor_num).to_upper()) if s.floor_num >= 11 else "FLOOR %d CLEARED" % s.floor_num
 	match s.phase:
 		Phase.REWARD:
 			var r: Dictionary = s.reward
 			var suit: String = r.get("suit", "S")
-			_sub.text = "Finished with %s: %s" % [Style.SUIT_SYM[suit], RULE_TEXT[suit]]
+			_sub.text = "Finished with %s: %s" % [Style.SUIT_SYM[suit], rule_text(_e.reward_rules(suit), _e.mod)]
 			var healed: int = int(_last_offer().get("healed", 0))
 			if healed > 0:
 				_sub.text += "\nYou got %d life back!" % healed
@@ -162,6 +156,21 @@ func refresh() -> void:
 	_update_sel()
 
 
+## The reward rule as it applies this run (the mod can change the numbers, e.g. Rich).
+static func rule_text(r: Dictionary, mod) -> String:
+	var reveal := int(r["reveal"])
+	var picks := int(r["picks"])
+	var t := ""
+	match str(r["suit"]):
+		"S": t = "Pick any of the beaten cards"
+		"C": t = "Reveal %d, take 1 and remove 1 card from your deck" % reveal
+		"H": t = "Get a life back (all lives: reveal %d, take %d)" % [reveal, picks]
+		"D": t = ("Reveal %d and take them all" % reveal) if picks >= reveal else ("Reveal %d and take %d" % [reveal, picks])
+	if mod != null and mod.id == "rich" and str(r["suit"]) != "S":
+		t += " (Rich)"
+	return t
+
+
 ## Reward cards shrink so they always fit on one row (4 options with Rich, all beaten cards with ♠).
 func _opt_size(n: int) -> Vector2:
 	var avail := maxf(300.0, size.x - 48.0 - 16.0)  # margins and a little slack
@@ -187,6 +196,10 @@ func _update_sel() -> void:
 	if tip_card == null:
 		tip_card = s.find_in(s.deck, _last_tapped)
 	Help.show_tip(_tip, s.balance, tip_card)
+	if tip_card == null:
+		# Keep the slot from looking empty: say what tapping does.
+		(_tip.get_node("Text") as Label).text = "Tap a card to see what it does."
+		_tip.visible = true
 	for id in _opt_views:
 		var cv: CardView = _opt_views[id]
 		cv.set_selected(_opt_sels.has(id))

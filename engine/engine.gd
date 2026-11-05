@@ -176,6 +176,7 @@ func _next_round() -> void:
 	# Fill the hand. With keep_hand, unplayed cards simply stay; otherwise only the retained ones.
 	state.overpowered = false
 	state.burns_this_round = 0
+	state.diamond_draws = 0
 	if not keep_hand():
 		state.hand = state.retained
 	state.retained = []
@@ -416,8 +417,9 @@ func _do_play_cards(ids: Array) -> bool:
 	_emit(Ev.CARDS_PLAYED, {"cards": _labels(cards), "ids": _ids(cards)})
 	var draws := _check_overpower()
 	for c in cards:
-		if c.suit == "D":
+		if c.suit == "D" and _diamond_draws():
 			draws += 1
+			state.diamond_draws += 1
 	_draw_now(draws)
 	return true
 
@@ -438,6 +440,17 @@ func _check_overpower() -> int:
 	state.overpowered = true
 	_emit(Ev.OVERPOWER, {"attack": ov, "enemy": block_need(), "ids": _ids(blacks), "cards": _labels(blacks)})
 	return int(state.balance.get("overpower_draw", 1))
+
+
+## Whether the next ♦ played draws a card (`diamond_draw`): "always", "block" (only while there is
+## an attack to block) or "once" (only the first ♦ each round).
+func _diamond_draws() -> bool:
+	match str(state.balance.get("diamond_draw", "always")):
+		"block":
+			return block_need() > 0
+		"once":
+			return state.diamond_draws == 0
+	return true
 
 
 func _draw_now(n: int) -> void:

@@ -15,7 +15,7 @@ static func card_info(b: Dictionary, c) -> String:
 		"H":
 			lines.append("Block %d. Leftover block is stored as shield for the next round; with no attack to block, all %d is stored." % [v, v])
 		"D":
-			lines.append("Block %d and draw 1 card from the draw pile, if it has any (also against a shield)." % v)
+			lines.append("Block %d and draw 1 card from the draw pile, if it has any (also against a shield)%s." % [v, _diamond_note(b)])
 		"S":
 			lines.append("Attack %d (%d × %s, rounded down)." % [int(floor(v * float(b["spade_multiplier"]))), v, str(b["spade_multiplier"])])
 		"C":
@@ -26,6 +26,13 @@ static func card_info(b: Dictionary, c) -> String:
 	if burn != "":
 		lines.append(burn)
 	return "\n".join(lines)
+
+
+static func _diamond_note(b: Dictionary) -> String:
+	match str(b.get("diamond_draw", "always")):
+		"once": return "; only the first ♦ each round draws"
+		"block": return "; only while blocking an attack"
+	return ""
 
 
 static func _no_refill(b: Dictionary) -> String:
@@ -77,7 +84,12 @@ static func card_effect(e, c) -> String:
 		"H":
 			lines.append("Block %d. Leftover block is stored as shield for the next round." % v)
 		"D":
-			lines.append(("Block %d and draw 1 card." % v) if not e.state.draw_pile.is_empty() else ("Block %d. The draw pile is empty: no card to draw." % v))
+			if e.state.draw_pile.is_empty():
+				lines.append("Block %d. The draw pile is empty: no card to draw." % v)
+			elif not e._diamond_draws():
+				lines.append("Block %d. A ♦ already drew this round: no card to draw." % v)
+			else:
+				lines.append("Block %d and draw 1 card." % v)
 		"S":
 			lines.append("Attack %d (%d × %s, rounded down)." % [int(floor(v * float(b["spade_multiplier"]))), v, str(b["spade_multiplier"])])
 		"C":
@@ -136,7 +148,7 @@ static func rules_overlay(main) -> Control:
 	lines.append("")
 	lines.append(H % "SUITS")
 	lines.append("♥ Block. Leftover block is stored as shield for the next round (with no attack: the full value).")
-	lines.append("♦ Block and draw 1 card (also against a shield), if the draw pile has cards. The discard pile is only shuffled back when your hand is refilled.")
+	lines.append("♦ Block and draw 1 card (also against a shield), if the draw pile has cards%s. The discard pile is only shuffled back when your hand is refilled." % _diamond_note(b))
 	lines.append("♠ Attack × %s (rounded down)." % str(b["spade_multiplier"]))
 	lines.append("♣ Attack. +%d if you play 2 or more clubs." % int(b["club_pair_bonus"]))
 	lines.append("")

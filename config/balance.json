@@ -17,6 +17,7 @@
   "failed_attack_returns": true,
   "spade_multiplier": 1.5,
   "club_pair_bonus": 1,
+  "diamond_draw": "once",
   "overpower_multiplier": 3,
   "overpower_draw": 1,
   "perfect_draw": 1,

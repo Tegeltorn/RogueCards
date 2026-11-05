@@ -22,7 +22,7 @@ Each round:
 | Suit | Effect |
 |---|---|
 | ♥ | Block. Leftover block is stored as shield **for the next round** (at most the hearts' total). With no attack to block, the hearts' full value is stored. Leave the hearts face up as a reminder. |
-| ♦ | Block. Draw 1 card for each diamond you play, even against a shield, if the draw pile has cards left (the discard pile is not shuffled back mid-round). The drawn cards can be played this round. |
+| ♦ | Block. The first diamond you play each round draws 1 card (`diamond_draw` `once`), even against a shield, if the draw pile has cards left (the discard pile is not shuffled back mid-round). The drawn card can be played this round. |
 | ♠ | Attack. Value × 1.5, rounded down (2→3, 3→4, 5→7 …). |
 | ♣ | Attack. +`club_pair_bonus` if you play at least two clubs in the same round. |
 
@@ -75,6 +75,7 @@ A test keeps these values in sync with `config/balance.json`.
 | `lives` | 2 | Number of life aces |
 | `graded_threshold` | 3 | Miss that costs 2 lives |
 | `failed_attack_returns` | true | An attack you fail to block goes to the bottom of the enemy pile |
+| `diamond_draw` | once | ♦ draws: `once` (first ♦ each round), `always`, or `block` (only against an attack) |
 | `club_pair_bonus` | 1 | Clubs bonus |
 | `overpower_multiplier` | 3 | Black value needed to overpower an attack (× its value) |
 | `overpower_draw` | 1 | Cards drawn on overpower |
