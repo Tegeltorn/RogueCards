@@ -32,7 +32,7 @@ Black cards played against an attack don't block. **Overpower:** once per round,
 
 **Damage:** a miss of 1 to `graded_threshold` − 1 costs 1 life. A bigger miss costs 2 lives. Put lost aces aside. When you have no aces left, you lose.
 
-**Ace sacrifice:** while you have at least 2 lives you may sacrifice a life ace during a round. You lose that life, and the ace counts as a card worth 14 in its own colour for that round (red blocks, black attacks).
+**Ace sacrifice:** while you have at least 2 lives you may sacrifice a life ace during a round. You lose that life, and the ace counts as a card worth `ace_value` in its own colour for that round (red blocks, black attacks).
 
 ## Rewards (after every floor except the kings)
 The suit of **your last card that counted** against the floor's final enemy card decides the reward: the last card you played (or burned) that blocked its attack or broke its shield. A sacrificed ace counts with its own suit. If no card of yours counted (a stored ♥ shield blocked it alone), the enemy card's own suit decides. You choose among the floor's beaten cards.
@@ -79,6 +79,7 @@ A test keeps these values in sync with `config/balance.json`.
 | `club_pair_bonus` | 1 | Clubs bonus |
 | `overpower_multiplier` | 3 | Black value needed to overpower an attack (× its value) |
 | `overpower_draw` | 1 | Cards drawn on overpower |
+| `ace_value` | 12 | What a sacrificed ace counts as |
 | `perfect_draw` | 1 | Extra cards next hand after a perfect hit |
 | `burn_mode` | double | Burned card: `double` its rank in its own colour, or `swap` to the other colour |
 | `burn_limit` | 0 | Cards you may burn per round (0 = no limit) |
