@@ -34,6 +34,9 @@ var _fresh_id := -1  # card that just landed in the deck (gets a pop + glow afte
 var _animating := false
 var _tip: PanelContainer
 var _last_tapped := -1  # card shown in the tooltip
+const TIP_H := 196.0  # height of the card info slot
+const OPT_GAP := 16
+const DECK_CARD := Vector2(100, 140)
 
 
 func enter() -> void:
@@ -49,7 +52,7 @@ func enter() -> void:
 	m.add_child(scroll)
 	_v = VBoxContainer.new()
 	_v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_v.add_theme_constant_override("separation", 16)
+	_v.add_theme_constant_override("separation", 10)
 	scroll.add_child(_v)
 	_title = Style.label("", 52, Style.GOLD)
 	_title.add_theme_constant_override("outline_size", 10)
@@ -60,15 +63,23 @@ func enter() -> void:
 	_v.add_child(_prompt)
 	_opts = HFlowContainer.new()
 	_opts.alignment = FlowContainer.ALIGNMENT_CENTER
-	_opts.add_theme_constant_override("h_separation", 16)
+	_opts.add_theme_constant_override("h_separation", OPT_GAP)
 	_opts.add_theme_constant_override("v_separation", 16)
 	# Room above the options so a selected (lifted) card doesn't cover the prompt.
 	var pad := MarginContainer.new()
-	pad.add_theme_constant_override("margin_top", 40)
+	pad.add_theme_constant_override("margin_top", 30)
 	pad.add_child(_opts)
 	_v.add_child(pad)
+	# The card info sits in a fixed-height slot, so tapping a card never makes the page longer.
+	var tip_slot := Control.new()
+	tip_slot.custom_minimum_size.y = TIP_H
+	tip_slot.clip_contents = true
+	_v.add_child(tip_slot)
 	_tip = Help.tip_box()
-	_v.add_child(_tip)
+	_tip.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
+	(_tip.get_node("Text") as Label).add_theme_font_size_override("font_size", 20)
+	(_tip.get_node("Text") as Label).autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	tip_slot.add_child(_tip)
 	_confirm = Style.button("", Style.RED, 32)
 	_confirm.custom_minimum_size.y = 90
 	_confirm.pressed.connect(_on_confirm)
@@ -84,7 +95,7 @@ func enter() -> void:
 	_deck.add_theme_constant_override("v_separation", 10)
 	# Room above the deck so a selected (lifted) card doesn't cover the "Your deck" label.
 	var deck_pad := MarginContainer.new()
-	deck_pad.add_theme_constant_override("margin_top", 40)
+	deck_pad.add_theme_constant_override("margin_top", 30)
 	deck_pad.add_child(_deck)
 	_v.add_child(deck_pad)
 	refresh()
@@ -118,7 +129,7 @@ func refresh() -> void:
 			for i in r["options"].size():
 				var o = r["options"][i]
 				var cv := CardView.new()
-				cv.setup(o, Vector2(150, 210))
+				cv.setup(o, _opt_size(r["options"].size()))
 				cv.tapped.connect(func(_x): _on_option(o.id))
 				_opts.add_child(cv)
 				_opt_views[o.id] = cv
@@ -133,7 +144,7 @@ func refresh() -> void:
 	sorted.sort_custom(func(a, b): return a.suit < b.suit or (a.suit == b.suit and a.rank < b.rank))
 	for c in sorted:
 		var cv := CardView.new()
-		cv.setup(c, Vector2(110, 154))
+		cv.setup(c, DECK_CARD)
 		cv.breathing = false
 		cv.tapped.connect(func(_x): _on_deck(c.id))
 		_deck.add_child(cv)
@@ -148,6 +159,13 @@ func refresh() -> void:
 					cv.highlight = Color(0, 0, 0, 0))
 			_fresh_id = -1
 	_update_sel()
+
+
+## Reward cards shrink so they always fit on one row (4 options with Rich, all beaten cards with ♠).
+func _opt_size(n: int) -> Vector2:
+	var avail := maxf(300.0, size.x - 48.0 - 40.0)  # margins and room for a scrollbar
+	var w := minf(136.0, floorf((avail - OPT_GAP * (n - 1)) / maxf(1.0, n)))
+	return Vector2(w, roundf(w * 1.4))
 
 
 ## Deck cards can be picked when swapping (full deck) or removing (♣).
@@ -302,11 +320,11 @@ func _animate_take(opt_id: int, out_id: int, index: int = 0) -> void:
 	var kids := _deck.get_children().filter(func(k): return k.visible)
 	if not kids.is_empty():
 		var last: Rect2 = kids[-1].get_global_rect()
-		target = last.position + Vector2(120 * (index + 1), 0)
-		if target.x + 110 > size.x:
-			target = Vector2(_deck.get_global_rect().position.x + 20, last.position.y + 164)
+		target = last.position + Vector2((DECK_CARD.x + 10) * (index + 1), 0)
+		if target.x + DECK_CARD.x > size.x:
+			target = Vector2(_deck.get_global_rect().position.x + 20, last.position.y + DECK_CARD.y + 10)
 	src.visible = false
-	await main.fly_card(card, src.get_global_rect(), target, Vector2(110, 154), 0.5).finished
+	await main.fly_card(card, src.get_global_rect(), target, DECK_CARD, 0.5).finished
 
 
 ## A deck card leaves (swap or ♣ removal): pops, rises and fades.
