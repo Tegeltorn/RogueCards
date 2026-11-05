@@ -209,6 +209,10 @@ var _tooltip: PanelContainer
 var _tooltip_label: Label
 var _lives_caption: Label
 var _fire: Fire
+var _op_box: PanelContainer   # overpower counter right of the sword (attacking enemies)
+var _op_value: Label
+var _op_info: PanelContainer  # short explanation shown when the counter is tapped
+var _op_info_tw: Tween
 var _finish_tip: PanelContainer
 var _finish_label: RichTextLabel
 var _mods_caption: Label
@@ -321,6 +325,36 @@ func _build() -> void:
 	_table = Control.new()
 	_table.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_table)
+	_op_box = PanelContainer.new()
+	_op_box.add_theme_stylebox_override("panel", Style.box(Color(Style.PANEL, 0.9), Color(Style.INK, 0.35), 1, 10))
+	var opv := VBoxContainer.new()
+	opv.add_theme_constant_override("separation", -4)
+	opv.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var opc := Style.label("OVERPOWER", 15, Style.MUTED)
+	opc.autowrap_mode = TextServer.AUTOWRAP_OFF
+	opc.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	opv.add_child(opc)
+	_op_value = Style.label("", 30, Style.WHITE)
+	_op_value.add_theme_font_override("font", Style.bold())
+	_op_value.autowrap_mode = TextServer.AUTOWRAP_OFF
+	_op_value.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	opv.add_child(_op_value)
+	_op_box.add_child(opv)
+	_op_box.visible = false
+	_op_box.z_index = 15
+	_tappable(_op_box, _toggle_op_info)
+	add_child(_op_box)
+	_op_info = PanelContainer.new()
+	_op_info.add_theme_stylebox_override("panel", Style.box(Color(Style.PANEL, 0.97), Color(Style.GOLD, 0.7), 2, 12))
+	_op_info.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var opl := Style.label("", 21, Style.WHITE, HORIZONTAL_ALIGNMENT_LEFT)
+	opl.name = "Text"
+	opl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	opl.custom_minimum_size = Vector2(380, 0)
+	_op_info.add_child(opl)
+	_op_info.visible = false
+	_op_info.z_index = 50
+	add_child(_op_info)
 	_fire = Fire.new()
 	_fire.font = Style.bold()
 	_fire.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -397,6 +431,9 @@ func _layout() -> void:
 	_total_label.size = Vector2(W, 80)
 	_total_label.pivot_offset = Vector2(W / 2, 40)
 	_finish_tip.position = Vector2(12, ey + 20)
+	# Overpower counter: right of the sword (the intent icon sits at x W/2 + card/2 + 18, 70 wide).
+	_op_box.position = Vector2(W / 2 + ENEMY_CARD.x / 2 + 92, ey + 62)
+	_op_box.size = Vector2(0, 0)
 	_need_label.position = Vector2(0, ty + 72)
 	_need_label.size = Vector2(W, 30)
 	_carry_label.position = Vector2(0, ty + 100)
@@ -668,6 +705,7 @@ func _update_controls() -> void:
 	_sync_piles()
 	_update_fire()
 	_update_total()
+	_update_op_counter()
 	_update_life_glow()
 	_update_tooltip()
 
@@ -801,8 +839,6 @@ func _update_total() -> void:
 			var od := int(s.balance.get("overpower_draw", 0))
 			_need_label.text = "OVERPOWER! Play: discard them" + (", draw %d" % od if od > 0 else "")
 			_need_label.add_theme_color_override("font_color", Style.GOLD)
-		else:
-			_need_label.text += "  ·  black %d/%d for overpower" % [_black_value(sel_cards), int(s.balance.get("overpower_multiplier", 2)) * int(t["block_need"])]
 	if int(t["block_need"]) == 0 and int(t["hearts"]) > 0:
 		_need_label.text += "  ·  ♥ stores %d shield" % int(t["hearts"])
 	if total != _last_total:
@@ -812,6 +848,55 @@ func _update_total() -> void:
 		if ok:
 			main.sfx.play("select", 1.4)
 
+
+
+## The overpower counter next to the sword: black attack played (+ the inspected card) / what it takes.
+func _update_op_counter() -> void:
+	var s = _e.state
+	var mult := int(s.balance.get("overpower_multiplier", 0))
+	var need: int = _e.block_need() * mult
+	var show: bool = s.phase == Phase.PLAY and mult > 0 and _e.block_need() > 0 and _e.attack_need() == 0 and s.current.size() == 1
+	_op_box.visible = show
+	if not show:
+		_op_info.visible = false
+		return
+	if s.overpowered:
+		_op_value.text = "done"
+		_op_value.add_theme_color_override("font_color", Style.GOLD)
+		return
+	var cards: Array = s.played.duplicate()
+	for id in _selected:
+		var c = s.find_in(s.hand, id)
+		if c != null:
+			cards.append(c)
+	var have := _black_value(cards)
+	_op_value.text = "%d/%d" % [have, need]
+	_op_value.add_theme_color_override("font_color", Style.GOLD if have >= need else Style.WHITE)
+
+
+func _toggle_op_info() -> void:
+	if _op_info.visible:
+		_op_info.visible = false
+		return
+	var s = _e.state
+	# Only one explanation at a time: the card tooltip steps aside.
+	_selected.clear()
+	_update_controls()
+	var mult := int(s.balance.get("overpower_multiplier", 2))
+	var od := int(s.balance.get("overpower_draw", 0))
+	(_op_info.get_node("Text") as Label).text = "Overpower: play black cards worth %d× this attack (%d) and they are discarded at once%s. Once per round. The enemy still attacks when you end your turn." % [mult, _e.block_need() * mult, (", and you draw %d card%s" % [od, "" if od == 1 else "s"]) if od > 0 else ""]
+	_op_info.visible = true
+	_op_info.reset_size()
+	# Left of the counter, over the enemy card, so the attack value stays visible.
+	_op_info.position = Vector2(maxf(12.0, _op_box.position.x - 78 - _op_info.size.x), _op_box.position.y - 10)
+	_op_info.modulate.a = 0.0
+	if _op_info_tw:
+		_op_info_tw.kill()
+	_op_info_tw = create_tween()
+	_op_info_tw.tween_property(_op_info, "modulate:a", 1.0, 0.15)
+	_op_info_tw.tween_interval(4.0)
+	_op_info_tw.tween_property(_op_info, "modulate:a", 0.0, 0.4)
+	_op_info_tw.tween_callback(func(): _op_info.visible = false)
 
 
 func _black_value(cards: Array) -> int:
