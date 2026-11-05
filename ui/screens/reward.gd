@@ -48,6 +48,7 @@ func enter() -> void:
 	m.add_theme_constant_override("margin_bottom", 30)
 	add_child(m)
 	var scroll := ScrollContainer.new()
+	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER  # scrolls by dragging, no bar
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	m.add_child(scroll)
 	_v = VBoxContainer.new()
@@ -163,7 +164,7 @@ func refresh() -> void:
 
 ## Reward cards shrink so they always fit on one row (4 options with Rich, all beaten cards with ♠).
 func _opt_size(n: int) -> Vector2:
-	var avail := maxf(300.0, size.x - 48.0 - 40.0)  # margins and room for a scrollbar
+	var avail := maxf(300.0, size.x - 48.0 - 16.0)  # margins and a little slack
 	var w := minf(136.0, floorf((avail - OPT_GAP * (n - 1)) / maxf(1.0, n)))
 	return Vector2(w, roundf(w * 1.4))
 

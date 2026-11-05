@@ -160,6 +160,7 @@ static func rules_overlay(main) -> Control:
 	var txt := "\n".join(lines)
 	var v := VBoxContainer.new()
 	var scroll := ScrollContainer.new()
+	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER  # scrolls by dragging, no bar
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	scroll.custom_minimum_size = Vector2(0, 820)
 	var rt := _text(txt, 24)

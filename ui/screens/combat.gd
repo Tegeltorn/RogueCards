@@ -296,7 +296,11 @@ func _layout() -> void:
 	_seed_label.position = Vector2(18, 74)
 	_seed_label.size = Vector2(300, 24)
 	_seed_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-	var ey := 190.0 + maxf(0.0, (H - 1280.0) * 0.25)
+	# The burn spot sits above the enemy pile, far from the hand, so a card isn't burned by accident.
+	var fire_h := 86.0
+	_fire.position = Vector2(W / 2 - 150, 100)
+	_fire.size = Vector2(300, fire_h)
+	var ey := 290.0 + maxf(0.0, (H - 1280.0) * 0.25)
 	_enemy_layer.position = Vector2(0, ey)
 	_enemy_layer.size = Vector2(W, ENEMY_CARD.y)
 	_stack_layer.position = Vector2(0, ey)
@@ -335,12 +339,6 @@ func _layout() -> void:
 	_hint_label.size = Vector2(W, 34)
 	_table.position = Vector2(0, ty + 134)
 	_table.size = Vector2(W, 110)
-	# The burn spot sits between the totals and the hand, clear of both.
-	var fy := ty + 134.0
-	var fh := clampf(hy - 56 - fy, 70.0, 104.0)
-	# Hugs the left wall, so dropping on the enemy (everything else above the hand) stays easy.
-	_fire.position = Vector2(12, fy + maxf(0.0, (hy - 56 - fy - fh) / 2))
-	_fire.size = Vector2(300, fh)
 	_layout_hand()
 	_layout_table()
 	_layout_enemies()

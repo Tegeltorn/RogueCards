@@ -18,6 +18,7 @@ func build(main) -> Control:
 	var v := VBoxContainer.new()
 	v.add_child(Style.label("Debug menu", 40, Style.GOLD))
 	var scroll := ScrollContainer.new()
+	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER  # scrolls by dragging, no bar
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	v.add_child(scroll)
