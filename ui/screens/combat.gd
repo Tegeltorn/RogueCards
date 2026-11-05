@@ -406,6 +406,10 @@ func _layout() -> void:
 	_menu_btn.position = Vector2(W - 112, 10)
 	_menu_btn.size = Vector2(100, 56)
 	_info_box.position = Vector2(W - 16 - MINI.x, 74)
+	# No mod ace in play: no mod card at the top.
+	var mods_on: bool = _e != null and bool(_e.state.balance.get("mods_enabled", false))
+	_info_box.visible = mods_on
+	_mods_caption.visible = mods_on
 
 	_mods_caption.position = Vector2(W - 216, 74 + MINI.y + 2)
 	_mods_caption.size = Vector2(200, 24)
@@ -699,7 +703,7 @@ func _update_controls() -> void:
 		_hint_label.text = ("Drag onto the enemy to play, onto the fire to burn – tap to inspect" if _burn_on() else "Drag cards onto the enemy to play them – tap to inspect") if _selected.is_empty() else ""
 	elif retaining:
 		_main_btn.text = "Continue"
-		_hint_label.text = "Tap to keep %d card for next round" % _e.retain_limit()
+		_hint_label.text = ("Too many cards: tap the %d to keep" if _e.keep_hand() else "Tap to keep %d card for next round") % _e.retain_limit()
 	else:
 		_hint_label.text = ""
 	_sync_piles()
@@ -820,11 +824,16 @@ func _update_total() -> void:
 			_need_label.text = "Exact!" if exact else "Enough"
 	else:
 		var miss := int(t["block_need"]) - int(t["block"])
+		var wound: bool = _e.failed_shield_mode() == "wound"
 		if miss > 0:
-			var lives := 2 if miss >= int(s.balance["graded_threshold"]) else 1
+			var lives: int = _e.miss_lives(miss)
 			_need_label.text = "Miss by %d: -%d %s" % [miss, lives, "life" if lives == 1 else "lives"]
 			if bool(s.balance.get("failed_attack_returns", false)):
 				_need_label.text += ", and it comes back"
+		elif wound:
+			var smiss := int(t["attack_need"]) - int(t["attack"])
+			var sl: int = _e.miss_lives(smiss)
+			_need_label.text = "Short by %d: -%d %s, then it falls" % [smiss, sl, "life" if sl == 1 else "lives"]
 		else:
 			_need_label.text = "The shield holds: it goes to the bottom and comes back"
 	_need_label.add_theme_color_override("font_color", Style.MUTED)
@@ -907,7 +916,8 @@ func _black_value(cards: Array) -> int:
 ## Small tip left of the enemy on a floor's last card: what each suit gives when you finish on it.
 func _update_finish_tip() -> void:
 	var s = _e.state
-	var show: bool = s.phase == Phase.PLAY and not s.is_boss() and s.enemy_pile.is_empty() and s.current.size() == 1
+	var show: bool = s.phase == Phase.PLAY and not s.is_boss() and s.enemy_pile.is_empty() and s.current.size() == 1 \
+		and not _e.menu_rewards()  # with the reward menu the finishing suit doesn't matter
 	_finish_tip.visible = show
 	if not show:
 		return
@@ -1301,6 +1311,9 @@ func play_event(ev: Dictionary) -> float:
 		Ev.ATTACK_FAILED:
 			main.haptic(1)  # the attack plays out
 			main.toast("The shield holds", Style.BLUE, 600, 48)
+			if _e.failed_shield_mode() == "wound":
+				main.sfx.play("block", 0.7)
+				return 0.5  # it costs lives and falls anyway (DAMAGE_TAKEN and ENEMY_DEFEATED follow)
 			for id in _enemy_views:
 				var cv: CardView = _enemy_views[id]
 				var c = _find_card(id)

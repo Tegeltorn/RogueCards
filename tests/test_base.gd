@@ -30,12 +30,22 @@ func scenario(hand: Array, enemies: Array, over: Dictionary = {}, opts: Dictiona
 	for k in over:
 		b[k] = over[k]
 	var e := GameEngine.new()
-	e.start_run(int(opts.get("seed", 1)), Balance.make(b), opts)
+	e.start_run(int(opts.get("seed", 1)), classic(b), opts)
 	while e.state.phase == Phase.SETUP_PICK:
 		e.setup_pick(e.state.setup_options[0].id)
 	e.ack_reveal()
 	set_round(e, hand, enemies, opts.get("pile", []))
 	return e
+
+
+## The rules before the combined proposal (config/presets/classic.json) with `over` on top: the
+## mechanic tests exercise each rule behind its key, independent of today's balance.json.
+static func classic(over: Dictionary = {}) -> Dictionary:
+	var b := Balance.load_json("res://config/presets/classic.json")
+	b.erase("_note")
+	for k in over:
+		b[k] = over[k]
+	return Balance.make(b)
 
 
 func set_round(e: GameEngine, hand: Array, enemies: Array, pile: Array = []) -> void:

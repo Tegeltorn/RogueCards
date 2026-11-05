@@ -9,23 +9,59 @@ const Balance := preload("res://engine/balance.gd")
 
 ## Everything a card does, without fight context (reward and start-pick screens).
 static func card_info(b: Dictionary, c) -> String:
-	var v: int = c.value()
-	var lines: Array = []
-	match c.suit:
-		"H":
-			lines.append("Block %d. Leftover block is stored as shield for the next round; with no attack to block, all %d is stored." % [v, v])
-		"D":
-			lines.append("Block %d and draw 1 card from the draw pile, if it has any (also against a shield)%s." % [v, _diamond_note(b)])
-		"S":
-			lines.append("Attack %d (%d × %s, rounded down)." % [int(floor(v * float(b["spade_multiplier"]))), v, str(b["spade_multiplier"])])
-		"C":
-			lines.append("Attack %d. +%d if you play 2 or more clubs in a round." % [v, int(b["club_pair_bonus"])])
-	if c.suit == "S" or c.suit == "C":
+	var lines: Array = [suit_line(b, c)]
+	if (c.suit == "S" or c.suit == "C") and int(b.get("overpower_multiplier", 0)) > 0:
 		lines.append("Against an attack it doesn't block, but counts toward overpower (%d× the attack: %s)." % [int(b.get("overpower_multiplier", 2)), _overpower_effect(b)])
 	var burn := burn_text(b, c)
 	if burn != "":
 		lines.append(burn)
 	return "\n".join(lines)
+
+
+## The suit's main line, following the balance (lone ♥/♠, ♣ plus or pair, ♠ × 1.5).
+static func suit_line(b: Dictionary, c) -> String:
+	var v: int = c.value()
+	match c.suit:
+		"H":
+			var lone := int(b.get("heart_lone_mult", 0))
+			var t := "Block %d" % v
+			if lone > 1:
+				t += " (%d if it is your only block card)" % (v * lone)
+			return t + ". Leftover block is stored as shield for the next round."
+		"D":
+			return "Block %d and draw 1 card, if the draw pile has any (also against a shield)%s." % [v, _diamond_note(b)]
+		"S":
+			if str(b.get("spade_mode", "mult")) == "lone":
+				return "Attack %d (%d if it is your only attack card)." % [v, v * int(b.get("spade_lone_mult", 2))]
+			return "Attack %d (%d × %s, rounded down)." % [int(floor(v * float(b["spade_multiplier"]))), v, str(b["spade_multiplier"])]
+		"C":
+			match str(b.get("club_mode", "pair")):
+				"plus":
+					return "Attack %d (%d + %d)." % [v + int(b.get("club_swarm_bonus", 0)), v, int(b.get("club_swarm_bonus", 0))]
+				"swarm":
+					return "Attack %d. +%d each if you play 2 or more clubs." % [v, int(b.get("club_swarm_bonus", 0))]
+			return "Attack %d. +%d if you play 2 or more clubs in a round." % [v, int(b["club_pair_bonus"])]
+	return ""
+
+
+## The suit's rule in general words (for the rules page).
+static func suit_rule(b: Dictionary, suit: String) -> String:
+	match suit:
+		"H":
+			var lone := int(b.get("heart_lone_mult", 0))
+			return "Block%s. Leftover block is stored as shield for the next round (with no attack: the full value)." % ((", × %d if it is your only block card" % lone) if lone > 1 else "")
+		"D":
+			return "Block and draw 1 card (also against a shield)%s." % _diamond_note(b)
+		"S":
+			if str(b.get("spade_mode", "mult")) == "lone":
+				return "Attack, × %d if it is your only attack card." % int(b.get("spade_lone_mult", 2))
+			return "Attack × %s (rounded down)." % str(b["spade_multiplier"])
+		"C":
+			match str(b.get("club_mode", "pair")):
+				"plus": return "Attack, +%d each." % int(b.get("club_swarm_bonus", 0))
+				"swarm": return "Attack. +%d each if you play 2 or more clubs." % int(b.get("club_swarm_bonus", 0))
+			return "Attack. +%d if you play 2 or more clubs." % int(b["club_pair_bonus"])
+	return ""
 
 
 static func _diamond_note(b: Dictionary) -> String:
@@ -81,19 +117,15 @@ static func card_effect(e, c) -> String:
 	var v: int = c.value()
 	var lines: Array = []
 	match c.suit:
-		"H":
-			lines.append("Block %d. Leftover block is stored as shield for the next round." % v)
+		"H", "S", "C":
+			lines.append(suit_line(b, c))
 		"D":
-			if e.state.draw_pile.is_empty():
+			if e.state.draw_pile.is_empty() and not bool(b.get("refill_mode", "") == "continuous" and not e.state.discard.is_empty()):
 				lines.append("Block %d. The draw pile is empty: no card to draw." % v)
 			elif not e._diamond_draws():
 				lines.append("Block %d. A ♦ already drew this round: no card to draw." % v)
 			else:
 				lines.append("Block %d and draw 1 card." % v)
-		"S":
-			lines.append("Attack %d (%d × %s, rounded down)." % [int(floor(v * float(b["spade_multiplier"]))), v, str(b["spade_multiplier"])])
-		"C":
-			lines.append("Attack %d. +%d if you play 2 or more clubs this round." % [v, int(b["club_pair_bonus"])])
 	var bneed: int = e.block_need()
 	var aneed: int = e.attack_need()
 	if not e.is_effective(c):
@@ -101,7 +133,7 @@ static func card_effect(e, c) -> String:
 			lines.append("No attack to block: stores %d shield for the next round." % v)
 		elif c.suit == "D":
 			lines.append("No attack to block: it only draws a card." if not e.state.draw_pile.is_empty() else "No attack to block, and the draw pile is empty: it does nothing now.")
-		elif bneed > 0 and aneed == 0:
+		elif bneed > 0 and aneed == 0 and int(b.get("overpower_multiplier", 0)) > 0:
 			lines.append("No shield to break. Black cards worth %d× the attack overpower: %s." % [int(b.get("overpower_multiplier", 2)), _overpower_effect(b)])
 	var burn := burn_text(b, c)
 	if burn != "" and e.can_burn(c):
@@ -142,19 +174,27 @@ static func rules_overlay(main) -> Control:
 	var H := "[color=" + Style.hex(Style.GOLD) + "]%s[/color]"
 	var lines: Array = []
 	lines.append("%s  An enemy card is revealed. [color=%s]Black = attack[/color], [color=%s]red = shield[/color]. Its value is its rank." % [H % "EACH ROUND", Style.hex(Style.RED), Style.hex(Style.BLUE)])
-	lines.append("• At the start of your turn you draw up to %d cards. Cards you don't play stay in your hand. When the draw pile is empty, the discard pile is shuffled into a new one first." % int(b["hand_size"]))
+	var dpt := int(b.get("draw_per_turn", 0))
+	if dpt > 0:
+		lines.append("• Each floor starts with a hand of %d. Every later round you draw %d. Cards you don't play stay in your hand, up to %d: discard down to that many at the end of your turn. When the draw pile runs out, the discard pile is shuffled into a new one." % [int(b["hand_size"]), dpt, int(b.get("hand_max", 0))])
+	else:
+		lines.append("• At the start of your turn you draw up to %d cards. Cards you don't play stay in your hand. When the draw pile is empty, the discard pile is shuffled into a new one first." % int(b["hand_size"]))
 	lines.append("• Drag a card onto the enemy to play it. Its effect happens at once (♦ draws a card). Only the right colour counts (green outline): red cards block attacks, black cards break shields. Tap a card to see what it does.")
 	lines.append("• Press End turn: the enemy acts and the round is resolved.")
 	lines.append("")
 	lines.append(H % "SUITS")
-	lines.append("♥ Block. Leftover block is stored as shield for the next round (with no attack: the full value).")
-	lines.append("♦ Block and draw 1 card (also against a shield), if the draw pile has cards%s. The discard pile is only shuffled back when your hand is refilled." % _diamond_note(b))
-	lines.append("♠ Attack × %s (rounded down)." % str(b["spade_multiplier"]))
-	lines.append("♣ Attack. +%d if you play 2 or more clubs." % int(b["club_pair_bonus"]))
+	for suit in ["H", "D", "S", "C"]:
+		lines.append(Style.SUIT_SYM[suit] + " " + suit_rule(b, suit))
 	lines.append("")
-	lines.append("%s  If your block is too low you lose a life (a miss of %d or more costs 2). %s" % [H % "ATTACK", int(b["graded_threshold"]),
-		("An attack you don't block goes to the bottom of the enemy pile and comes back: sacrificing an ace to block it can be worth it." if bool(b.get("failed_attack_returns", false)) else "The attack card is beaten either way.")])
-	lines.append("%s  Break it with enough attack, or it goes to the bottom of the enemy pile and comes back. Cards that can't break it still cycle your hand: play them to draw fresh ones next round." % (H % "SHIELD"))
+	var fight_once: bool = str(b.get("failed_shield", "return")) == "wound"
+	var g := int(b.get("graded_threshold", 0))
+	var two := (" (a miss of %d or more costs 2)" % g) if g > 0 else ""
+	if fight_once:
+		lines.append("%s  Every enemy card is fought once. Block an attack, or break a shield, with at least its value. If you fall short you lose a life%s, and the card is beaten anyway." % [H % "FIGHT", two])
+	else:
+		lines.append("%s  If your block is too low you lose a life%s. %s" % [H % "ATTACK", two,
+			("An attack you don't block goes to the bottom of the enemy pile and comes back." if bool(b.get("failed_attack_returns", false)) else "The attack card is beaten either way.")])
+		lines.append("%s  Break it with enough attack, or it goes to the bottom of the enemy pile and comes back." % (H % "SHIELD"))
 	match str(b.get("burn_mode", "off")):
 		"double":
 			lines.append("%s  Drag a card onto the fire: it burns up and leaves your deck for good. This round it counts double its rank in its own colour (no suit effect). %s" % [H % "BURN", _burn_limits(b)])
@@ -164,14 +204,22 @@ static func rules_overlay(main) -> Control:
 		lines.append("%s  Block exactly the attack, or break a shield with exactly its value: draw %d extra card in your next hand." % [H % "PERFECT", int(b["perfect_draw"])])
 	if int(b.get("overpower_multiplier", 0)) > 0:
 		lines.append("%s  Once per round, black cards played against an attack worth %d× its value: %s. The enemy still attacks at End turn." % [H % "OVERPOWER", int(b["overpower_multiplier"]), _overpower_effect(b)])
-	lines.append("%s  Your aces at the bottom. Tap them to see them, or to sacrifice one: you lose that life and it counts as %d this round." % [H % "LIVES", int(b["ace_value"])])
+	if bool(b.get("ace_sac_enabled", false)):
+		lines.append("%s  Your aces at the bottom. Tap them to see them, or to sacrifice one: you lose that life and it counts as %d this round." % [H % "LIVES", int(b["ace_value"])])
+	else:
+		lines.append("%s  Your aces at the bottom are your lives. Lose them all and the run ends." % (H % "LIVES"))
 	lines.append("")
-	lines.append("%s  The suit of your last card that counted against the floor's final enemy card decides: ♠ pick any beaten card · ♣ reveal 2, take 1, remove 1 · ♥ heal a life · ♦ reveal 2, take both. %s" % [H % "REWARDS",
-		("You may decline any card to keep your deck lean." if int(b["deck_cap"]) <= 0 else "Your deck holds up to %d cards; when it is full you swap or decline." % int(b["deck_cap"]))])
+	if str(b.get("reward_mode", "suit")) == "menu":
+		lines.append("%s  After each floor choose one: take one of the beaten cards, trade one in (take one, put one of yours back in the box), cull up to %d of your cards, or take back a lost ace. Trading and culling need a deck of at least %d cards." % [H % "REWARDS", int(b.get("menu_cull", 2)), int(b["deck_min"])])
+	else:
+		lines.append("%s  The suit of your last card that counted against the floor's final enemy card decides: ♠ pick any beaten card · ♣ reveal 2, take 1, remove 1 · ♥ heal a life · ♦ reveal 2, take both. %s" % [H % "REWARDS",
+			("You may decline any card to keep your deck lean." if int(b["deck_cap"]) <= 0 else "Your deck holds up to %d cards; when it is full you swap or decline." % int(b["deck_cap"]))])
 	var road := "%s  Every floor has 4 enemy cards: %d up to Queen, then the four kings." % [H % "THE ROAD", int(b.get("first_floor", 4))]
 	if int(b["face_hand_size"]) < int(b["hand_size"]):
-		road += " The face cards (Jack, Queen, King) demand tribute: only %d cards in hand." % int(b["face_hand_size"])
-	lines.append(road + " Tap the ace at the top to see your mod.")
+		road += " From the %s floor the face cards demand tribute: a hand of %d." % [{11: "Jack", 12: "Queen", 13: "King"}.get(int(b.get("face_from", 11)), str(int(b.get("face_from", 11)))), int(b["face_hand_size"])]
+	if bool(b.get("mods_enabled", false)):
+		road += " Tap the ace at the top to see your mod."
+	lines.append(road)
 	var txt := "\n".join(lines)
 	var v := VBoxContainer.new()
 	var scroll := ScrollContainer.new()

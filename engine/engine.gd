@@ -381,7 +381,14 @@ func _black_total(blacks: Array) -> int:
 		atk += _attack_val(c)
 		if c.suit == "C" and not _plain(c):
 			clubs += 1
-	if clubs >= 2:
+	if str(b.get("club_mode", "pair")) == "plus":
+		# ♣ "plus": every ♣ attacks for its rank + club_swarm_bonus.
+		atk += clubs * int(b.get("club_swarm_bonus", 1))
+	elif str(b.get("club_mode", "pair")) == "pack":
+		# ♣ "pack": each ♣ gets +club_swarm_bonus when it attacks together with another black card.
+		if blacks.size() >= 2:
+			atk += clubs * int(b.get("club_swarm_bonus", 1))
+	elif clubs >= 2:
 		if str(b.get("club_mode", "pair")) == "swarm":
 			atk += clubs * int(b.get("club_swarm_bonus", 1))
 		else:
@@ -407,10 +414,14 @@ func compute(cards: Array) -> Dictionary:
 			blacks.append(c)
 	var block := carry
 	var hearts := 0
+	# ♥ `heart_lone_mult` > 0: a ♥ that is your only block card counts × that (like a lone ♠).
+	var lone_h := int(state.balance.get("heart_lone_mult", 0))
+	var lone: bool = lone_h > 0 and reds.size() == 1 and reds[0].suit == "H" and not _plain(reds[0])
 	for c in reds:
-		block += _block_val(c)
+		var v := _block_val(c) * (lone_h if lone else 1)
+		block += v
 		if c.suit == "H" and not _plain(c):
-			hearts += _block_val(c)
+			hearts += v
 	var attack := _black_total(blacks)
 	if not blacks.is_empty():
 		attack = mod.modify_player_attack(attack)
@@ -971,8 +982,11 @@ func menu_can(kind: String) -> bool:
 	if state.phase != Phase.REWARD or not state.reward.get("menu", false):
 		return false
 	match kind:
-		"take", "trade":
+		"take":
 			return not state.reward.get("options", []).is_empty()
+		"trade":
+			# Trading (take one, put one back) needs a deck of at least deck_min cards.
+			return not state.reward.get("options", []).is_empty() and state.deck.size() >= int(state.balance["deck_min"])
 		"cull":
 			return state.deck.size() > int(state.balance["deck_min"])
 		"heal":
@@ -1013,6 +1027,7 @@ func _do_reward_menu(kind: String, take_ids: Array = [], remove_ids: Array = [])
 		rems.append(c)
 	if takes.size() > max_take or rems.size() > max_remove:
 		return false
+	# Putting cards back (trade or cull) needs a deck of deck_min, and never leaves it smaller.
 	if not rems.is_empty() and state.deck.size() + takes.size() - rems.size() < int(state.balance["deck_min"]):
 		return false
 	if kind == "heal":

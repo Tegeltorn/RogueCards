@@ -30,9 +30,10 @@ func enter() -> void:
 	var rows := [
 		["Floor", "King (won)" if won else Style.floor_text(s.floor_num)],
 		["Lives left", str(s.lives.size())],
-		["Mod ace", Style.SUIT_SYM[s.mod_suit] + " " + _mod_name()],
 		["Seed", str(s.seed_value)],
 	]
+	if bool(s.balance.get("mods_enabled", false)):
+		rows.insert(2, ["Mod ace", Style.SUIT_SYM[s.mod_suit] + " " + _mod_name()])
 	var grid := GridContainer.new()
 	grid.columns = 2
 	grid.add_theme_constant_override("h_separation", 30)

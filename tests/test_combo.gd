@@ -33,3 +33,24 @@ func test_combo_every_enemy_fought_once() -> void:
 	e.resolve()  # 3 attack against a 5 shield (a small miss): it falls anyway, for a life
 	eq(e.state.lives.size(), int(p["lives"]) - 1, "a failed shield costs 1 life")
 	check(not e.state.enemy_pile.any(func(c): return c.rank == 5), "and does not come back")
+
+
+func test_trade_needs_deck_min() -> void:
+	var p := Balance.load_json("res://config/presets/combo.json")
+	p.erase("_note")
+	var e := scenario([], ["4S"], p)
+	e.state.deck = cards(e, ["2H", "2D", "2S", "2C", "3H", "3S"])  # 6 cards, below deck_min 9
+	e.state.current = []
+	e.state.enemy_pile = []
+	e.state.beaten = cards(e, ["4H", "4D", "4S", "4C"])
+	e.state.last_beaten = e.state.beaten[3]
+	e._floor_cleared()
+	check(e.state.reward.get("menu", false), "reward menu")
+	check(not e.menu_can("cull"), "no cull below deck_min")
+	var take = e.state.reward["options"][0]
+	check(not e.menu_can("trade"), "no trade below deck_min")
+	check(not e.reward_menu("trade", [take.id], [e.state.deck[0].id]), "trade refused")
+	e.state.deck += cards(e, ["5H", "5S", "6D"])  # 9 cards
+	check(e.menu_can("trade"), "trade at deck_min")
+	check(e.reward_menu("trade", [take.id], [e.state.deck[0].id]), "trade done")
+	eq(e.state.deck.size(), 9, "same size")

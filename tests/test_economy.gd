@@ -63,7 +63,7 @@ func test_variant_presets_replay_and_finish() -> void:
 		ov.erase("_note")
 		for seed in [7, 19]:
 			var e := GameEngine.new()
-			e.start_run(seed, Balance.make(ov))
+			e.start_run(seed, classic(ov))
 			var bot := Bot.new()
 			var steps := 0
 			while e.state.result == "" and steps < 400:

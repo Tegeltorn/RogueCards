@@ -16,7 +16,7 @@ func test_kings_floor_is_the_four_kings() -> void:
 
 func test_every_floor_has_four_cards() -> void:
 	var e := GameEngine.new()
-	e.start_run(3, Balance.make({"mods_enabled": false}), {})
+	e.start_run(3, classic({"mods_enabled": false}), {})
 	while e.state.phase == Phase.SETUP_PICK:
 		e.setup_pick(e.state.setup_options[0].id)
 	e.ack_reveal()
@@ -72,18 +72,18 @@ func test_hardened() -> void:
 
 func test_random_start_threes() -> void:
 	var e := GameEngine.new()
-	e.start_run(5, Balance.make({"mods_enabled": false, "start_random": 2, "start_pick_take": 0}), {})
+	e.start_run(5, classic({"mods_enabled": false, "start_random": 2, "start_pick_take": 0}), {})
 	eq(e.state.phase, Phase.REVEAL, "no pick: straight to the reveal")
 	eq(e.state.deck.size(), 6, "four twos + two random threes")
 	eq(e.state.deck.filter(func(c): return c.rank == 3).size(), 2, "two threes")
 	var f := GameEngine.new()
-	f.start_run(5, Balance.make({"mods_enabled": false, "start_random": 2}), {})
+	f.start_run(5, classic({"mods_enabled": false, "start_random": 2}), {})
 	eq(ids(f.state.deck), ids(e.state.deck), "same seed, same threes")
 
 
 func test_start_pick() -> void:
 	var e := GameEngine.new()
-	e.start_run(5, Balance.make({"mods_enabled": false, "start_random": 0, "start_pick_offer": 3, "start_pick_take": 1}), {})
+	e.start_run(5, classic({"mods_enabled": false, "start_random": 0, "start_pick_offer": 3, "start_pick_take": 1}), {})
 	eq(e.state.phase, Phase.SETUP_PICK, "start pick")
 	eq(e.state.setup_options.size(), 3, "three threes offered")
 	eq(e.state.setup_picks, 1, "keep one")
@@ -98,7 +98,7 @@ func test_start_pick() -> void:
 
 func test_rich_reveals_more() -> void:
 	var e := GameEngine.new()
-	e.start_run(5, Balance.make({}), {"force_mod": "D"})
+	e.start_run(5, classic({}), {"force_mod": "D"})
 	eq(int(e.reward_rules("C")["reveal"]), 3, "♣ reward reveals 3")
 	eq(int(e.reward_rules("D")["picks"]), 3, "♦ reward takes all 3 revealed cards")
 	eq(int(e.reward_rules("D")["reveal"]), 3, "♦ reward reveals 3")
@@ -106,7 +106,7 @@ func test_rich_reveals_more() -> void:
 
 func test_spec_preset_starts_on_three() -> void:
 	var e := GameEngine.new()
-	e.start_run(5, Balance.make(Balance.load_json("res://config/presets/spec.json")), {"force_mod": "S"})
+	e.start_run(5, classic(Balance.load_json("res://config/presets/spec.json")), {"force_mod": "S"})
 	eq(e.state.phase, Phase.REVEAL, "no start pick in the spec rules")
 	e.ack_reveal()
 	eq(e.state.floor_num, 3, "spec starts on the threes")
@@ -114,23 +114,23 @@ func test_spec_preset_starts_on_three() -> void:
 
 func test_setup_lives() -> void:
 	var e := GameEngine.new()
-	e.start_run(42, Balance.make({"mods_enabled": false}), {})
-	eq(e.state.lives.size(), int(Balance.make()["lives"]), "lives from balance.json")
+	e.start_run(42, classic({"mods_enabled": false}), {})
+	eq(e.state.lives.size(), int(classic()["lives"]), "lives from balance.json")
 	for a in e.state.lives:
 		check(a.suit != e.state.mod_suit, "mod ace is not a life")
-	eq(e.state.deck.size(), 4 + int(Balance.make()["start_random"]), "four twos + the random threes")
+	eq(e.state.deck.size(), 4 + int(classic()["start_random"]), "four twos + the random threes")
 
 
 func test_determinism() -> void:
 	var logs: Array = []
 	for i in 2:
 		var e := GameEngine.new()
-		e.start_run(1234, Balance.make({}), {})
+		e.start_run(1234, classic({}), {})
 		Bot.new().play_run(e)
 		logs.append(JSON.stringify(e.state.events))
 	eq(logs[0], logs[1], "same seed -> same log")
 	var e3 := GameEngine.new()
-	e3.start_run(1235, Balance.make({}), {})
+	e3.start_run(1235, classic({}), {})
 	Bot.new().play_run(e3)
 	check(JSON.stringify(e3.state.events) != logs[0], "different seed differs")
 
@@ -140,7 +140,7 @@ func test_bot_runs_finish() -> void:
 	for sd in range(1, 200):
 		var e := GameEngine.new()
 		e.record_events = false
-		e.start_run(sd, Balance.make({}), {})
+		e.start_run(sd, classic({}), {})
 		Bot.new().play_run(e)
 		# "stuck": an unbreakable shield (a player would restart); it must stay rare.
 		check(["win", "dead", "stuck"].has(e.state.result), "seed %d result %s" % [sd, e.state.result])

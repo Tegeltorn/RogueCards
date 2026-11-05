@@ -100,7 +100,7 @@ func test_variant_runs_replay() -> void:
 	for over in [{"reward_mode": "menu", "menu_take": 1, "deck_min": 6, "club_mode": "swarm", "hand_per_deck": 4},
 			{"reward_mode": "choice", "heart_mode": "wall", "spade_mode": "lone"}]:
 		var e := GameEngine.new()
-		e.start_run(17, Balance.make(over))
+		e.start_run(17, classic(over))
 		var bot := Bot.new()
 		var steps := 0
 		while e.state.result == "" and steps < 400:

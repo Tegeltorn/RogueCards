@@ -33,8 +33,13 @@ func enter() -> void:
 	_v.add_child(Style.label("Seed %d" % s.seed_value, 22, Style.MUTED))
 
 	var mod_ev := _find_event("mod_revealed")
-	_v.add_child(_reveal_block(s.mod_ace, "MOD ACE", mod_ev.get("name", "") if mod_ev.get("active", true) else "Mods disabled",
-		mod_ev.get("desc", "") if mod_ev.get("active", true) else "", 0.3))
+	if mod_ev.get("active", true):
+		_v.add_child(_reveal_block(s.mod_ace, "MOD ACE", mod_ev.get("name", ""), mod_ev.get("desc", ""), 0.3))
+	else:
+		var t := Style.label("A NEW RUN", 52, Style.GOLD)
+		t.add_theme_constant_override("outline_size", 10)
+		_v.add_child(t)
+		_v.add_child(Style.label("Beat four enemy cards on each floor, from the fours to the kings.", 24, Style.WHITE))
 
 	var lives := "Lives: " + "  ".join(s.lives.map(func(a): return "A" + Style.SUIT_SYM[a.suit]))
 	_v.add_child(Style.label(lives, 26, Style.WHITE))

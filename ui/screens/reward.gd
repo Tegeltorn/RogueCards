@@ -22,6 +22,7 @@ var _skip: Button
 var _confirm: Button
 var _opt_sels: Array = []  # selected reward options (card ids), up to the number of picks
 var _deck_sel := -1  # selected deck card (swap target or card to remove)
+var _deck_sels: Array = []  # reward menu: deck cards to trade away or cull
 var _opt_views: Dictionary = {}
 var _deck_views: Dictionary = {}
 var _fresh_id := -1  # card that just landed in the deck (gets a pop + glow after refresh)
@@ -112,7 +113,10 @@ func refresh() -> void:
 		Phase.REWARD:
 			var r: Dictionary = s.reward
 			var suit: String = r.get("suit", "S")
-			_sub.text = "Finished with %s: %s" % [Style.SUIT_SYM[suit], rule_text(_e.reward_rules(suit), _e.mod)]
+			if r.get("menu", false):
+				_sub.text = "Choose one: take a card, trade one in, cull up to %d, or heal" % int(r.get("cull", 2))
+			else:
+				_sub.text = "Finished with %s: %s" % [Style.SUIT_SYM[suit], rule_text(_e.reward_rules(suit), _e.mod)]
 			var healed: int = int(_last_offer().get("healed", 0))
 			if healed > 0:
 				_sub.text += "\nYou got %d life back!" % healed
@@ -183,6 +187,8 @@ func _deck_pickable() -> bool:
 	var s = _e.state
 	match s.phase:
 		Phase.REWARD:
+			if _menu():
+				return _e.menu_can("cull") or _e.menu_can("trade")
 			return _e.removal_needed(_opt_sels.size()) or (_e.deck_full() and not _opt_sels.is_empty())
 		Phase.REWARD_REMOVE:
 			return true
@@ -207,9 +213,10 @@ func _update_sel() -> void:
 	var pickable := _deck_pickable()
 	for id in _deck_views:
 		var cv: CardView = _deck_views[id]
+		var picked: bool = _deck_sels.has(id) if _menu() else id == _deck_sel
 		cv.set_interactive(pickable)
-		cv.set_selected(pickable and id == _deck_sel)
-		if pickable and id == _deck_sel:
+		cv.set_selected(pickable and picked)
+		if pickable and picked:
 			cv.highlight = Style.GOLD
 		elif pickable:
 			cv.highlight = Color(Style.GOLD, 0.3)
@@ -221,7 +228,10 @@ func _update_sel() -> void:
 	_skip.visible = false
 	match s.phase:
 		Phase.REWARD:
-			_update_reward_buttons(dk)
+			if _menu():
+				_update_menu_buttons()
+			else:
+				_update_reward_buttons(dk)
 		Phase.REWARD_REMOVE:
 			_prompt.text = "Tap a card in your deck to remove"
 			_set_confirm("Remove %s" % dk.label() if dk != null else "Pick a card to remove", dk != null)
@@ -266,6 +276,38 @@ func _update_reward_buttons(dk) -> void:
 	_skip.text = "Decline the reward"
 
 
+## Reward menu: what the selection means, said on the main button.
+##   a reward card            -> Take it
+##   a reward card + deck card -> Trade (take one, put one back in the box)
+##   deck cards only          -> Cull them (up to `cull`, deck never below deck_min)
+## The second button heals a life (when one is lost) or takes nothing.
+func _update_menu_buttons() -> void:
+	var s = _e.state
+	var take: Array = _opt_sels.map(func(id): return s.find_in(s.reward.get("options", []), id)).filter(func(c): return c != null)
+	var rem: Array = _deck_sels.map(func(id): return s.find_in(s.deck, id)).filter(func(c): return c != null)
+	var dmin := int(s.balance["deck_min"])
+	var text := "Pick a card to take, or deck cards to cull"
+	var ok := false
+	if not take.is_empty() and rem.is_empty():
+		text = "Take %s" % take[0].label()
+		ok = true
+	elif not take.is_empty():
+		text = "Trade: take %s, put %s in the box" % [take[0].label(), rem[0].label()]
+		ok = true
+	elif not rem.is_empty():
+		text = "Cull %s" % " + ".join(rem.map(func(c): return c.label()))
+		ok = s.deck.size() - rem.size() >= dmin
+		if not ok:
+			text = "Your deck can't go below %d cards" % dmin
+	if _deck_pickable():
+		_prompt.text = "Tap a reward card and/or up to %d of your cards" % int(s.reward.get("cull", 2))
+	else:
+		_prompt.text = "Tap a card to take (trade and cull from %d cards in your deck)" % dmin
+	_set_confirm(text, ok)
+	_skip.visible = true
+	_skip.text = "Heal: take back a lost ace" if _e.menu_can("heal") else "Take nothing"
+
+
 func _set_confirm(text: String, enabled: bool) -> void:
 	_confirm.text = text
 	_confirm.disabled = not enabled
@@ -282,12 +324,31 @@ func _on_option(id: int) -> void:
 			_opt_sels.pop_front()
 		_opt_sels.append(id)
 	_last_tapped = id
+	if _menu() and not _opt_sels.is_empty() and _deck_sels.size() > 1:
+		_deck_sels = _deck_sels.slice(_deck_sels.size() - 1)
 	main.sfx.play("card")
 	_update_sel()
 
 
+func _menu() -> bool:
+	return _e.state.phase == Phase.REWARD and _e.state.reward.get("menu", false)
+
+
 func _on_deck(id: int) -> void:
 	if main.is_busy() or _animating or not _deck_pickable():
+		return
+	if _menu():
+		# Trade (with a reward card selected): one deck card. Cull: up to `cull` deck cards.
+		var cap: int = 1 if not _opt_sels.is_empty() else int(_e.state.reward.get("cull", 2))
+		if _deck_sels.has(id):
+			_deck_sels.erase(id)
+		else:
+			if _deck_sels.size() >= cap:
+				_deck_sels.pop_front()
+			_deck_sels.append(id)
+		_last_tapped = id if _deck_sels.has(id) else -1
+		main.sfx.play("card")
+		_update_sel()
 		return
 	_deck_sel = -1 if _deck_sel == id else id
 	_last_tapped = _deck_sel if _deck_sel >= 0 else (_opt_sels[-1] if not _opt_sels.is_empty() else -1)
@@ -306,6 +367,18 @@ func _on_confirm() -> void:
 	_deck_sel = -1
 	_confirm.disabled = true
 	main.sfx.play("reward")
+	if _menu():
+		var rems := _deck_sels.duplicate()
+		_deck_sels.clear()
+		var kind := "take" if rems.is_empty() else ("trade" if not takes.is_empty() else "cull")
+		for id in rems:
+			await _animate_out(id)
+		for i in takes.size():
+			await _animate_take(takes[i], -1, i)
+		_fresh_id = takes[0] if not takes.is_empty() else -1
+		main.act(func(): _e.reward_menu(kind, takes, rems))
+		_animating = false
+		return
 	match s.phase:
 		Phase.REWARD:
 			var full: bool = _e.deck_full() and not takes.is_empty()
@@ -359,6 +432,14 @@ func _on_skip() -> void:
 		return
 	_opt_sels.clear()
 	_deck_sel = -1
+	_deck_sels.clear()
+	if _menu():
+		var heal: bool = _e.menu_can("heal")
+		if heal or _e.menu_can("take"):
+			main.act(func(): _e.reward_menu("heal" if heal else "take", [], []))
+		else:
+			main.act(func(): _e.reward_skip())
+		return
 	main.act(func(): _e.reward_resolve([]))
 
 

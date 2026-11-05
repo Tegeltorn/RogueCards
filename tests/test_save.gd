@@ -36,7 +36,7 @@ func test_nested_actions_are_journaled_once() -> void:
 
 func test_snapshot_survives_text_round_trip() -> void:
 	var e := GameEngine.new()
-	e.start_run(12, Balance.make({"lives": 2}), {"force_mod": "S"})
+	e.start_run(12, classic({"lives": 2}), {"force_mod": "S"})
 	while e.state.phase == Phase.SETUP_PICK:
 		e.setup_pick(e.state.setup_options[0].id)
 	e.ack_reveal()

@@ -3,91 +3,65 @@
 A solo game for a standard deck of 52 cards, played like a patience. You need nothing but the cards (the jokers are not used).
 
 ## Setup
-1. **Starting deck:** the four twos (2♥ 2♦ 2♠ 2♣). Then shuffle the four threes and deal `start_random` of them into your deck, face down: a deck of six cards. The other threes are not used.
-2. **Mod ace:** shuffle the four aces and draw one. Its suit sets the run's mod (see below). Put `lives` of the other aces in front of you as your **lives**.
-3. **Enemies:** ranks `first_floor` (4) to King, one pile of four cards per rank (the kings are the last floor).
+1. **Lives:** the four aces are your lives (`lives` of them: put the others back in the box). Lose them all and the run ends.
+2. **Starting deck:** the four twos (2♥ 2♦ 2♠ 2♣). Shuffle the four threes and deal `start_random` of them into your deck, face down: a deck of six cards. The other threes are not used.
+3. **Enemies:** ranks `first_floor` (4) to King, one pile of four cards per rank. Each floor is the four cards of its rank, shuffled; the kings are the last floor.
 
 ## Floors and rounds
-Play the floors in order: 4, 5 … 10, Jack, Queen and finally the kings. Every floor is the four cards of its rank, shuffled. **At the start of each floor** shuffle your whole deck into a new draw pile. The discard pile is emptied, and kept cards and stored shield are reset.
+Play the floors in order: 4, 5 … 10, Jack, Queen, King. **At the start of each floor** shuffle your whole deck into a new draw pile; the discard pile and stored shield are cleared, and you draw a hand of `hand_size` cards. **The face cards demand tribute:** from the Jack floor on (`face_from` 11) the hand is `face_hand_size`.
 
 Each round:
 1. **Reveal** the top enemy card. Black = attack, red = shield. Its value is its rank.
-2. **Fill your hand** up to `hand_size` cards (`face_hand_size` on the Jack, Queen and King floors). Cards you didn't play last round are still in your hand. If the draw pile is **empty**, first shuffle the discard pile into a new draw pile, face down. If it only has a few cards, draw those and stop: the discard pile is shuffled back only when the draw pile is empty at the start of a turn. If you burned a card last round, skip this step (`burn_no_refill`).
-3. **Play** any cards you like. Only the right colour counts against the enemy: red cards block attacks, black cards break shields. Cards of the wrong colour still trigger their own effects (♦ draws, ♥ stores shield).
-   - **Attack:** if your block is enough the attack is beaten. Otherwise you take damage, and (with `failed_attack_returns`) the attack card goes to the bottom of the enemy pile and comes back. Sacrificing an ace to block it is often worth it.
-   - **Shield:** if your attack is enough the shield is beaten. Otherwise it goes to the bottom of the enemy pile and comes back. Cards that can't break it still help you cycle: play them and they go to the discard pile, so you draw fresh ones next round. If you can't ever break it, the run is stuck: start a new one.
-   - **Burn:** while your deck has at least `burn_min_deck` cards, you may burn cards from your hand, as many as you like (`burn_limit` 0 = no limit). A burned card counts **double its rank in its own colour** this round (`burn_mode` `double`), with no suit effect (no ♦ draw, no ♥ storing, no ♠ × 1.5, no ♣ bonus). Then it is gone for good: put it back in the box. The price: your hand is not refilled at the start of the next round. (With `burn_mode` `swap` it counts its rank in the other colour instead.)
-4. **End your turn:** the revealed enemy card is resolved as above. Every played card goes to the discard pile; unplayed cards stay in your hand (`keep_hand`). With `keep_hand` off, you instead keep up to `retain` unplayed cards and discard the rest.
+2. **Draw** `draw_per_turn` cards (not in the first round of a floor). If the draw pile runs out while you draw, shuffle the discard pile into a new draw pile and keep drawing (`refill_mode` continuous).
+3. **Play** any cards you like. Only the right colour counts: red cards block attacks, black cards break shields. Cards of the wrong colour still trigger their own effects (♦ draws, ♥ stores shield).
+4. **End your turn:** the enemy card is resolved. **Every enemy card is fought once:** if your block (against an attack) or your attack (against a shield) reaches its value, it is beaten; if not, you lose 1 life — 2 lives if you missed by `graded_threshold` or more — and it is beaten anyway (`failed_attack_returns` false, `failed_shield` wound). Played cards go to the discard pile. Unplayed cards stay in your hand, but you hold at most `hand_max`: discard down to that many, your choice.
 
 | Suit | Effect |
 |---|---|
-| ♥ | Block. Leftover block is stored as shield **for the next round** (at most the hearts' total). With no attack to block, the hearts' full value is stored. Leave the hearts face up as a reminder. |
-| ♦ | Block. The first diamond you play each round draws 1 card (`diamond_draw` `once`), even against a shield, if the draw pile has cards left (the discard pile is not shuffled back mid-round). The drawn card can be played this round. |
-| ♠ | Attack. Value × 1.5, rounded down (2→3, 3→4, 5→7 …). |
-| ♣ | Attack. +`club_pair_bonus` if you play at least two clubs in the same round. |
+| ♥ | Block. A ♥ that is your only block card this round counts double (`heart_lone_mult`). Leftover block is stored as shield for the next round (at most the hearts' total); with no attack to block, the hearts' full value is stored. |
+| ♦ | Block. Each ♦ you play draws 1 card (`diamond_draw` always), even against a shield, if the draw pile has cards. |
+| ♠ | Attack. A ♠ that is your only attack card this round counts double (`spade_mode` lone, `spade_lone_mult`); with other attack cards, just its rank. |
+| ♣ | Attack. Each ♣ counts its rank + `club_swarm_bonus` (`club_mode` plus). |
 
-**Perfect:** when your block exactly equals the attack, or your attack exactly equals the shield, draw `perfect_draw` extra cards in your next hand (0 = no bonus).
+## After each floor (except the kings): choose one
+- **Take:** add one of the floor's four beaten cards to your deck.
+- **Trade:** add one beaten card and put one of your deck cards back in the box.
+- **Cull:** put up to `menu_cull` of your deck cards back in the box.
+- **Heal:** take back one lost ace.
 
-Black cards played against an attack don't block. **Overpower:** once per round, when the black cards you have played against an attack add up to at least `overpower_multiplier` × its value (♠ × 1.5 and the ♣ bonus count), discard them right away and draw `overpower_draw` cards. The enemy still attacks when you end your turn.
+Trade and cull need a deck of at least `deck_min` cards, and culling never takes it below that (`reward_mode` menu).
 
-**Damage:** a miss of 1 to `graded_threshold` − 1 costs 1 life. A bigger miss costs 2 lives. Put lost aces aside. When you have no aces left, you lose.
-
-**Ace sacrifice:** while you have at least 2 lives you may sacrifice a life ace during a round. You lose that life, and the ace counts as a card worth `ace_value` in its own colour for that round (red blocks, black attacks).
-
-## Rewards (after every floor except the kings)
-The suit of **your last card that counted** against the floor's final enemy card decides the reward: the last card you played (or burned) that blocked its attack or broke its shield. A sacrificed ace counts with its own suit. If no card of yours counted (a stored ♥ shield blocked it alone), the enemy card's own suit decides. You choose among the floor's beaten cards.
-
-| Finishing card | Reward |
-|---|---|
-| ♠ | Pick any of the beaten cards. |
-| ♣ | Reveal 2, take 1, and remove 1 card of your choice from your deck (choose both together). |
-| ♥ | Get one lost life back. With all lives: reveal 2 and take 1. |
-| ♦ | Reveal 2 and take both. |
-
-Your deck has no size limit (`deck_cap` 0), and you may decline any reward card (`reward_optional`) to keep your deck lean. With a `deck_cap`, you must add cards until the deck is full; then swap a card out for the new one or decline. Your deck can never shrink below `deck_min` cards.
-
-## The kings
-The last floor is the four kings, with `face_hand_size` cards in hand like the Jacks and Queens. Beat all four to win.
-
-## Mods (mod ace)
-| Mod ace | Mod |
-|---|---|
-| ♥ Hardened | Your mod ace is an extra life, but ace sacrifice is disabled. Attacks you fail to block are beaten anyway. |
-| ♦ Rich | Every reward reveals 1 more card, and a ♦ reward lets you take all of them. |
-| ♠ Bloodthirst | Your attack gets +4, but every enemy attack also gets +1. |
-| ♣ Foresight | Keep the top card of the enemy pile face up: you always see the next enemy card. |
+Beat the four kings to win.
 
 ## Current balance values
-A test keeps these values in sync with `config/balance.json`.
+A test keeps these values in sync with `config/balance.json`. Older rules (returning cards, burn, overpower, perfect hits, mods, suit rewards) are still in the engine behind their keys, off by default; `config/presets/classic.json` holds the previous rule set.
 
 | Key | Value | Meaning |
 |---|---|---|
 | `first_floor` | 4 | First enemy floor |
 | `start_random` | 2 | Threes dealt at random into the starting deck |
-| `hand_size` | 3 | Hand size |
-| `face_hand_size` | 3 | Hand size on the Jack, Queen and King floors |
-| `keep_hand` | true | Unplayed cards stay in hand between rounds |
-| `retain` | 1 | Cards you may keep (only when `keep_hand` is off) |
-| `deck_cap` | 0 | Max cards in your deck (0 = no limit) |
-| `reward_optional` | true | You may always decline a reward card |
-| `deck_min` | 4 | Min cards in your deck (♣ removal) |
-| `lives` | 3 | Number of life aces |
-| `graded_threshold` | 3 | Miss that costs 2 lives |
-| `failed_attack_returns` | true | An attack you fail to block goes to the bottom of the enemy pile |
-| `diamond_draw` | once | ♦ draws: `once` (first ♦ each round), `always`, or `block` (only against an attack) |
-| `club_pair_bonus` | 1 | Clubs bonus |
-| `overpower_multiplier` | 2 | Black value needed to overpower an attack (× its value) |
-| `overpower_draw` | 1 | Cards drawn on overpower |
-| `ace_value` | 14 | What a sacrificed ace counts as |
-| `perfect_draw` | 2 | Extra cards next hand after a perfect hit |
-| `burn_mode` | double | Burned card: `double` its rank in its own colour, or `swap` to the other colour |
-| `burn_limit` | 0 | Cards you may burn per round (0 = no limit) |
-| `burn_min_deck` | 5 | Cards your deck needs to burn one |
-| `burn_no_refill` | true | After a round you burned in, your hand is not refilled |
-| `burn_draw` | 2 | Cards drawn for a burned card (only with `burn_mode` `dig`: the burned card has no value) |
-| `refill_mode` | empty | `empty`: the discard pile is shuffled back only into an empty draw pile; `continuous`: when the draw pile runs out while you fill your hand, shuffle the discard pile and keep drawing |
-| `draw_per_turn` | 0 | 0 = fill up to the hand size; otherwise the floor's first hand is filled up to the hand size and every later round draws this many cards |
-| `hand_max` | 0 | Hand limit at the end of your turn when you keep your hand (discard down to it, your choice; 0 = none) |
-| `redraw_limit` | 0 | Redraws allowed (0 = off): before you play, discard any cards from your hand and draw as many |
-| `redraw_scope` | round | Whether `redraw_limit` counts per `round` or per `floor` |
-| `redraw_cost` | 0 | A redraw draws this many fewer cards than you discarded |
+| `lives` | 2 | Number of life aces |
+| `hand_size` | 4 | Hand drawn at the start of each floor |
+| `face_from` | 11 | First floor that demands tribute (Jack) |
+| `face_hand_size` | 3 | Hand size from that floor on |
+| `draw_per_turn` | 2 | Cards drawn each later round |
+| `hand_max` | 4 | Most cards you may hold at the end of a turn |
+| `refill_mode` | continuous | Shuffle the discard pile when the draw pile runs out mid-draw |
+| `failed_attack_returns` | false | A failed attack does not come back (it is beaten anyway) |
+| `failed_shield` | wound | A failed shield costs lives like a missed attack and is beaten anyway |
+| `graded_threshold` | 2 | A miss this big costs 2 lives |
+| `heart_lone_mult` | 2 | A lone ♥ block counts × this |
+| `diamond_draw` | always | Every ♦ played draws a card |
+| `spade_mode` | lone | A lone ♠ attack counts × `spade_lone_mult` |
+| `spade_lone_mult` | 2 | Multiplier for a lone ♠ |
+| `club_mode` | plus | Every ♣ gets + `club_swarm_bonus` |
+| `club_swarm_bonus` | 4 | The ♣ bonus |
+| `reward_mode` | menu | After a floor: take, trade, cull or heal |
+| `menu_take` | 1 | Cards you may take |
+| `menu_cull` | 2 | Cards you may cull |
+| `deck_min` | 9 | Deck size needed to trade or cull (never culled below) |
+| `burn_mode` | off | Burning is not used |
+| `overpower_multiplier` | 0 | Overpower is not used |
+| `perfect_draw` | 0 | No bonus for perfect hits |
+| `ace_sac_enabled` | false | Aces are not sacrificed |
+| `mods_enabled` | false | No mod ace |
