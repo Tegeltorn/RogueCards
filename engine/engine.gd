@@ -190,7 +190,7 @@ func _next_round() -> void:
 		to_draw = 0
 		_emit(Ev.REFILL_SKIPPED, {"hand": state.hand.size()})
 	for i in to_draw:
-		var d = _draw_one()
+		var d = _draw_one(true)
 		if d == null:
 			break
 		state.hand.append(d)
@@ -198,9 +198,11 @@ func _next_round() -> void:
 	_emit(Ev.HAND_FILLED, {"hand": _labels(state.hand), "ids": _ids(state.hand)})
 
 
-func _draw_one():
+## The discard pile is shuffled into a new draw pile only when the hand is refilled (end of turn,
+## `reshuffle`) and at the start of a floor. Mid-round draws (♦, overpower) need cards in the draw pile.
+func _draw_one(reshuffle: bool = false):
 	if state.draw_pile.is_empty():
-		if state.discard.is_empty():
+		if not reshuffle or state.discard.is_empty():
 			return null
 		state.draw_pile = state.discard
 		state.discard = []

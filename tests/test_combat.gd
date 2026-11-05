@@ -132,12 +132,22 @@ func test_diamond_draws_same_round() -> void:
 	check(has_event(e, Ev.BLOCKED), "3+6 blocks 9")
 
 
-func test_draw_reshuffles_discard() -> void:
+func test_diamond_needs_cards_in_the_draw_pile() -> void:
 	var e := scenario(["3D"], ["9S"], {}, {"pile": ["5S"]})
 	e.state.discard = cards(e, ["4H"])
 	e.play_cards([e.state.hand[0].id])
-	check(has_event(e, Ev.DECK_RESHUFFLED), "reshuffled")
-	eq(e.state.hand[0].label(), "4♥", "drew from old discard")
+	check(not has_event(e, Ev.DECK_RESHUFFLED), "no reshuffle mid-round")
+	eq(e.state.hand.size(), 0, "nothing drawn")
+	eq(e.state.discard.size(), 1, "discard untouched")
+
+
+func test_refill_reshuffles_discard() -> void:
+	var e := scenario(["3D"], ["2S"], {"hand_size": 2}, {"pile": ["5S"]})
+	e.state.discard = cards(e, ["4H", "4C"])
+	e.play_cards([e.state.hand[0].id])
+	e.resolve()  # end of turn: the hand is refilled from the shuffled discard pile
+	check(has_event(e, Ev.DECK_RESHUFFLED), "reshuffled at the refill")
+	eq(e.state.hand.size(), 2, "refilled")
 
 
 func test_ace_sacrifice() -> void:

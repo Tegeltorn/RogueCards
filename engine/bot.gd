@@ -79,8 +79,8 @@ func _play_thrifty(e) -> void:
 				e.play_cards(_ids(blacks))  # overpower: unclog the black cards, draw 1
 				continue
 			var dias: Array = s.hand.filter(func(c): return c.suit == "D")
-			if not dias.is_empty():
-				e.play_cards([dias[0].id])  # ♦ always draws
+			if not dias.is_empty() and not s.draw_pile.is_empty():
+				e.play_cards([dias[0].id])  # ♦ draws while the draw pile has cards
 				continue
 			plan = _cheapest_plan(e, true, _burns_left(e))
 			if plan.is_empty() and short_block:

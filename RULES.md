@@ -12,7 +12,7 @@ Play the floors in order: 4, 5 … 10, Jack, Queen and finally the kings. Every 
 
 Each round:
 1. **Reveal** the top enemy card. Black = attack, red = shield. Its value is its rank.
-2. **Fill your hand** up to `hand_size` cards. The face cards demand tribute: on the Jack, Queen and King floors only up to `face_hand_size`. If you burned a card last round, skip this step (`burn_no_refill`). Cards you didn't play last round are still in your hand. If the draw pile is empty, shuffle the discard pile into a new one.
+2. **Fill your hand** up to `hand_size` cards. The face cards demand tribute: on the Jack, Queen and King floors only up to `face_hand_size`. If you burned a card last round, skip this step (`burn_no_refill`). Cards you didn't play last round are still in your hand. If the draw pile runs out while you fill your hand, shuffle the discard pile into a new draw pile. This is the only time the discard pile is shuffled back during a floor.
 3. **Play** any cards you like. Only the right colour counts against the enemy: red cards block attacks, black cards break shields. Cards of the wrong colour still trigger their own effects (♦ draws, ♥ stores shield).
    - **Attack:** if your block is enough the attack is beaten. Otherwise you take damage, and (with `failed_attack_returns`) the attack card goes to the bottom of the enemy pile and comes back. Sacrificing an ace to block it is often worth it.
    - **Shield:** if your attack is enough the shield is beaten. Otherwise it goes to the bottom of the enemy pile and comes back. Cards that can't break it still help you cycle: play them and they go to the discard pile, so you draw fresh ones next round. If you can't ever break it, the run is stuck: start a new one.
@@ -22,7 +22,7 @@ Each round:
 | Suit | Effect |
 |---|---|
 | ♥ | Block. Leftover block is stored as shield **for the next round** (at most the hearts' total). With no attack to block, the hearts' full value is stored. Leave the hearts face up as a reminder. |
-| ♦ | Block. Draw 1 card for each diamond you play, even against a shield. The drawn cards can be played this round. |
+| ♦ | Block. Draw 1 card for each diamond you play, even against a shield, if the draw pile has cards left (the discard pile is not shuffled back mid-round). The drawn cards can be played this round. |
 | ♠ | Attack. Value × 1.5, rounded down (2→3, 3→4, 5→7 …). |
 | ♣ | Attack. +`club_pair_bonus` if you play at least two clubs in the same round. |
 

@@ -338,8 +338,9 @@ func _layout() -> void:
 	# The burn spot sits between the totals and the hand, clear of both.
 	var fy := ty + 134.0
 	var fh := clampf(hy - 56 - fy, 70.0, 104.0)
-	_fire.position = Vector2(W / 2 - 170, fy + maxf(0.0, (hy - 56 - fy - fh) / 2))
-	_fire.size = Vector2(340, fh)
+	# Hugs the left wall, so dropping on the enemy (everything else above the hand) stays easy.
+	_fire.position = Vector2(12, fy + maxf(0.0, (hy - 56 - fy - fh) / 2))
+	_fire.size = Vector2(300, fh)
 	_layout_hand()
 	_layout_table()
 	_layout_enemies()
