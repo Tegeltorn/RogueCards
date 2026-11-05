@@ -37,7 +37,8 @@ func _run() -> void:
 		var steps := 0
 		if r == 0:
 			await _overlays(main)
-		while main.engine.state.result == "" and steps < 400:
+		# A floor this long means an unbreakable shield (the rules allow a stuck run: the player restarts).
+		while main.engine.state.result == "" and steps < 400 and main.engine.state.floor_round <= Bot.STUCK_ROUNDS:
 			await _shot(main, main.screen_name + "_" + main.engine.state.phase_name())
 			if r == 0 and main.screen_name == "reward":
 				await _reward_via_ui(main)
@@ -57,7 +58,7 @@ func _run() -> void:
 				errors += 1
 		await _shot(main, "summary_" + main.engine.state.result)
 		print("run %d: %s on floor %d after %d steps" % [r, main.engine.state.result, main.engine.state.floor_num, steps])
-		if main.engine.state.result == "":
+		if main.engine.state.result == "" and main.engine.state.floor_round <= Bot.STUCK_ROUNDS:
 			errors += 1
 	# Resume: a run saved mid-fight comes back on start (as after the page reloads).
 	main.new_run(7)
@@ -174,6 +175,11 @@ func _fight_via_ui(main) -> void:
 		scr._on_drag_started(cv)
 		scr._on_drag_moved(cv, drop)
 		scr._on_drag_released(cv, drop)
+		return
+	if short:
+		# Nothing in hand helps: let the bot finish the round (it cycles the hand against a shield
+		# it can't break, so the run doesn't stall).
+		main.act(func(): Bot.new().step(e))
 		return
 	scr._on_main()
 

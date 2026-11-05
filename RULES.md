@@ -73,11 +73,11 @@ A test keeps these values in sync with `config/balance.json`.
 | `reward_optional` | true | You may always decline a reward card |
 | `deck_min` | 4 | Min cards in your deck (♣ removal) |
 | `lives` | 2 | Number of life aces |
-| `graded_threshold` | 4 | Miss that costs 2 lives |
+| `graded_threshold` | 3 | Miss that costs 2 lives |
 | `failed_attack_returns` | true | An attack you fail to block goes to the bottom of the enemy pile |
 | `club_pair_bonus` | 1 | Clubs bonus |
-| `overpower_multiplier` | 2 | Black value needed to overpower an attack (× its value) |
-| `overpower_draw` | 0 | Cards drawn on overpower |
+| `overpower_multiplier` | 3 | Black value needed to overpower an attack (× its value) |
+| `overpower_draw` | 1 | Cards drawn on overpower |
 | `perfect_draw` | 1 | Extra cards next hand after a perfect hit |
 | `burn_mode` | double | Burned card: `double` its rank in its own colour, or `swap` to the other colour |
 | `burn_limit` | 0 | Cards you may burn per round (0 = no limit) |
