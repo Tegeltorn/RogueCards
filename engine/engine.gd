@@ -29,7 +29,7 @@ var journal: Array = []
 var _start: Dictionary = {}
 var _depth := 0  # > 0 while an action runs (actions calling actions are not journaled twice)
 
-const SAVE_VERSION := 3
+const SAVE_VERSION := 4
 
 
 # ---------------------------------------------------------------- setup
@@ -77,8 +77,19 @@ func start_run(p_seed: int, balance: Dictionary = {}, options: Dictionary = {}) 
 	_emit(Ev.MOD_REVEALED, {"suit": state.mod_suit, "name": mod.name, "desc": mod.desc, "active": b["mods_enabled"]})
 
 	state.floor_num = int(options.get("start_floor", first_floor()))
-	# Start pick: reveal `start_pick_offer` random cards of `start_pick_rank` and keep some of them.
+	# Random start cards: `start_random` cards of `start_pick_rank` (the threes), dealt at random.
 	var pick_rank := int(b.get("start_pick_rank", 0))
+	var extra := clampi(int(b.get("start_random", 0)), 0, 4)
+	if pick_rank > 0 and extra > 0:
+		var threes: Array = []
+		for s in Card.SUITS:
+			threes.append(_new_card(pick_rank, s))
+		rng.shuffle(threes)
+		for c in threes.slice(0, extra):
+			state.deck.append(c)
+			_excluded[c.rank] = _excluded.get(c.rank, []) + [c.suit]
+			_emit(Ev.SETUP_PICKED, {"card": c.label(), "id": c.id})
+	# Optional start pick: reveal `start_pick_offer` cards of `start_pick_rank` and keep some of them.
 	var picks := mod.modify_start_picks(int(b.get("start_pick_take", 0)))
 	if pick_rank > 0 and picks > 0:
 		var pool: Array = []
@@ -190,8 +201,12 @@ func _next_round() -> void:
 		state.skip_refill = false
 		to_draw = 0
 		_emit(Ev.REFILL_SKIPPED, {"hand": state.hand.size()})
+	# Start of turn: only an empty draw pile is refilled from the shuffled discard pile. A short draw
+	# pile is not topped up: you draw what is there.
+	if to_draw > 0 and state.draw_pile.is_empty() and not state.discard.is_empty():
+		_reshuffle()
 	for i in to_draw:
-		var d = _draw_one(true)
+		var d = _draw_one()
 		if d == null:
 			break
 		state.hand.append(d)
@@ -199,17 +214,19 @@ func _next_round() -> void:
 	_emit(Ev.HAND_FILLED, {"hand": _labels(state.hand), "ids": _ids(state.hand)})
 
 
-## The discard pile is shuffled into a new draw pile only when the hand is refilled (end of turn,
-## `reshuffle`) and at the start of a floor. Mid-round draws (♦, overpower) need cards in the draw pile.
-func _draw_one(reshuffle: bool = false):
+## Draws the top card of the draw pile, or null when it is empty. The discard pile is shuffled back
+## only at the start of a turn whose draw pile is empty (see _next_round), and at a new floor.
+func _draw_one():
 	if state.draw_pile.is_empty():
-		if not reshuffle or state.discard.is_empty():
-			return null
-		state.draw_pile = state.discard
-		state.discard = []
-		rng.shuffle(state.draw_pile)
-		_emit(Ev.DECK_RESHUFFLED, {"count": state.draw_pile.size()})
+		return null
 	return state.draw_pile.pop_back()
+
+
+func _reshuffle() -> void:
+	state.draw_pile = state.discard
+	state.discard = []
+	rng.shuffle(state.draw_pile)
+	_emit(Ev.DECK_RESHUFFLED, {"count": state.draw_pile.size()})
 
 
 

@@ -4,7 +4,7 @@ extends RefCounted
 const BALANCE_PATH := "res://config/balance.json"
 const MODS_PATH := "res://config/mods.json"
 
-const INT_KEYS := ["first_floor", "start_pick_rank", "start_pick_offer", "start_pick_take", "hand_size", "face_hand_size", "retain", "deck_cap", "deck_min", "lives",
+const INT_KEYS := ["first_floor", "start_pick_rank", "start_pick_offer", "start_pick_take", "start_random", "hand_size", "face_hand_size", "retain", "deck_cap", "deck_min", "lives",
 	"graded_threshold", "club_pair_bonus", "overpower_multiplier", "overpower_draw", "perfect_draw", "min_draw", "ace_value", "burn_limit", "burn_min_deck"]
 const BOOL_KEYS := ["keep_hand", "reward_optional", "free_discard", "ace_sac_enabled", "ace_sac_suit_effects",
 	"mods_enabled", "failed_attack_returns", "burn_no_refill"]

@@ -50,7 +50,8 @@ func enter() -> void:
 	_v.add_child(pad)
 	_tip = Help.tip_box()
 	_v.add_child(_tip)
-	_deck_label = Style.label("Your deck", 22, Style.MUTED)
+	var extra := int(s.balance.get("start_random", 0))
+	_deck_label = Style.label("Your deck: the four twos" + ((" and %d threes dealt at random" % extra) if extra > 0 else ""), 22, Style.MUTED)
 	_v.add_child(_deck_label)
 	_deck_row = HBoxContainer.new()
 	_deck_row.alignment = BoxContainer.ALIGNMENT_CENTER

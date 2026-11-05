@@ -53,7 +53,7 @@ static func describe(e: Dictionary) -> String:
 		RUN_STARTED: return "New run, seed %s" % str(e.get("seed"))
 		MOD_REVEALED: return "Mod ace: %s (%s)" % [SUIT_NAME.get(e.get("suit"), "?"), e.get("name", "")]
 		SETUP_PICK: return "Pick a three for your deck"
-		SETUP_PICKED: return "Added %s to the deck" % e.get("card", "")
+		SETUP_PICKED: return "Dealt %s into your deck" % e.get("card", "")
 		FLOOR_STARTED: return "— Floor %s (%d cards) —" % [floor_name(e.get("floor", 0)), e.get("count", 0)]
 		ENEMY_REVEALED:
 			return "Enemy: %s (%s %d), %d in pile" % [e.get("card", ""),

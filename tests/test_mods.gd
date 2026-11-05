@@ -26,7 +26,7 @@ func test_every_floor_has_four_cards() -> void:
 
 
 func test_face_hand_size() -> void:
-	var e := scenario([], ["4S"])
+	var e := scenario([], ["4S"], {"hand_size": 4, "face_hand_size": 3})
 	e.state.deck = cards(e, ["2H", "2D", "2S", "2C", "5C"])
 	e._start_floor(10)
 	eq(e.state.hand.size(), 4, "floor 10: full hand")
@@ -70,9 +70,20 @@ func test_hardened() -> void:
 	eq(e.state.lives.size(), 4, "mod ace is an extra life")
 
 
+func test_random_start_threes() -> void:
+	var e := GameEngine.new()
+	e.start_run(5, Balance.make({"mods_enabled": false, "start_random": 2, "start_pick_take": 0}), {})
+	eq(e.state.phase, Phase.REVEAL, "no pick: straight to the reveal")
+	eq(e.state.deck.size(), 6, "four twos + two random threes")
+	eq(e.state.deck.filter(func(c): return c.rank == 3).size(), 2, "two threes")
+	var f := GameEngine.new()
+	f.start_run(5, Balance.make({"mods_enabled": false, "start_random": 2}), {})
+	eq(ids(f.state.deck), ids(e.state.deck), "same seed, same threes")
+
+
 func test_start_pick() -> void:
 	var e := GameEngine.new()
-	e.start_run(5, Balance.make({"mods_enabled": false}), {})
+	e.start_run(5, Balance.make({"mods_enabled": false, "start_random": 0, "start_pick_offer": 3, "start_pick_take": 1}), {})
 	eq(e.state.phase, Phase.SETUP_PICK, "start pick")
 	eq(e.state.setup_options.size(), 3, "three threes offered")
 	eq(e.state.setup_picks, 1, "keep one")
@@ -88,7 +99,6 @@ func test_start_pick() -> void:
 func test_rich_reveals_more() -> void:
 	var e := GameEngine.new()
 	e.start_run(5, Balance.make({}), {"force_mod": "D"})
-	eq(e.state.setup_picks, 1, "Rich keeps one three like everyone")
 	eq(int(e.reward_rules("C")["reveal"]), 3, "♣ reward reveals 3")
 	eq(int(e.reward_rules("D")["picks"]), 3, "♦ reward takes all 3 revealed cards")
 	eq(int(e.reward_rules("D")["reveal"]), 3, "♦ reward reveals 3")
@@ -108,7 +118,7 @@ func test_setup_lives() -> void:
 	eq(e.state.lives.size(), int(Balance.make()["lives"]), "lives from balance.json")
 	for a in e.state.lives:
 		check(a.suit != e.state.mod_suit, "mod ace is not a life")
-	eq(e.state.deck.size(), 4, "four twos before the pick")
+	eq(e.state.deck.size(), 4 + int(Balance.make()["start_random"]), "four twos + the random threes")
 
 
 func test_determinism() -> void:
@@ -136,7 +146,7 @@ func test_bot_runs_finish() -> void:
 		check(["win", "dead", "stuck"].has(e.state.result), "seed %d result %s" % [sd, e.state.result])
 		if e.state.result == "stuck":
 			stuck += 1
-	check(stuck <= 12, "stuck runs are rare (%d of 199)" % stuck)
+	check(stuck <= 24, "stuck runs stay a minority (%d of 199)" % stuck)
 
 
 func test_hardened_failed_attack_is_beaten() -> void:

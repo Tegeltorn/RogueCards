@@ -3,7 +3,7 @@
 A solo game for a standard deck of 52 cards, played like a patience. You need nothing but the cards (the jokers are not used).
 
 ## Setup
-1. **Starting deck:** the four twos (2♥ 2♦ 2♠ 2♣). Then shuffle the four threes, reveal `start_pick_offer` of them and add `start_pick_take` of your choice to your deck. The other threes are not used.
+1. **Starting deck:** the four twos (2♥ 2♦ 2♠ 2♣). Then shuffle the four threes and deal `start_random` of them into your deck, face down: a deck of six cards. The other threes are not used.
 2. **Mod ace:** shuffle the four aces and draw one. Its suit sets the run's mod (see below). Put `lives` of the other aces in front of you as your **lives**.
 3. **Enemies:** ranks `first_floor` (4) to King, one pile of four cards per rank (the kings are the last floor).
 
@@ -12,7 +12,7 @@ Play the floors in order: 4, 5 … 10, Jack, Queen and finally the kings. Every 
 
 Each round:
 1. **Reveal** the top enemy card. Black = attack, red = shield. Its value is its rank.
-2. **Fill your hand** up to `hand_size` cards. The face cards demand tribute: on the Jack, Queen and King floors only up to `face_hand_size`. If you burned a card last round, skip this step (`burn_no_refill`). Cards you didn't play last round are still in your hand. If the draw pile runs out while you fill your hand, shuffle the discard pile into a new draw pile. This is the only time the discard pile is shuffled back during a floor.
+2. **Fill your hand** up to `hand_size` cards (`face_hand_size` on the Jack, Queen and King floors). Cards you didn't play last round are still in your hand. If the draw pile is **empty**, first shuffle the discard pile into a new draw pile, face down. If it only has a few cards, draw those and stop: the discard pile is shuffled back only when the draw pile is empty at the start of a turn. If you burned a card last round, skip this step (`burn_no_refill`).
 3. **Play** any cards you like. Only the right colour counts against the enemy: red cards block attacks, black cards break shields. Cards of the wrong colour still trigger their own effects (♦ draws, ♥ stores shield).
    - **Attack:** if your block is enough the attack is beaten. Otherwise you take damage, and (with `failed_attack_returns`) the attack card goes to the bottom of the enemy pile and comes back. Sacrificing an ace to block it is often worth it.
    - **Shield:** if your attack is enough the shield is beaten. Otherwise it goes to the bottom of the enemy pile and comes back. Cards that can't break it still help you cycle: play them and they go to the discard pile, so you draw fresh ones next round. If you can't ever break it, the run is stuck: start a new one.
@@ -63,24 +63,23 @@ A test keeps these values in sync with `config/balance.json`.
 | Key | Value | Meaning |
 |---|---|---|
 | `first_floor` | 4 | First enemy floor |
-| `start_pick_offer` | 3 | Threes revealed at the start |
-| `start_pick_take` | 1 | Threes you keep |
-| `hand_size` | 4 | Hand size |
+| `start_random` | 2 | Threes dealt at random into the starting deck |
+| `hand_size` | 3 | Hand size |
 | `face_hand_size` | 3 | Hand size on the Jack, Queen and King floors |
 | `keep_hand` | true | Unplayed cards stay in hand between rounds |
 | `retain` | 1 | Cards you may keep (only when `keep_hand` is off) |
 | `deck_cap` | 0 | Max cards in your deck (0 = no limit) |
 | `reward_optional` | true | You may always decline a reward card |
 | `deck_min` | 4 | Min cards in your deck (♣ removal) |
-| `lives` | 2 | Number of life aces |
+| `lives` | 3 | Number of life aces |
 | `graded_threshold` | 3 | Miss that costs 2 lives |
 | `failed_attack_returns` | true | An attack you fail to block goes to the bottom of the enemy pile |
 | `diamond_draw` | once | ♦ draws: `once` (first ♦ each round), `always`, or `block` (only against an attack) |
 | `club_pair_bonus` | 1 | Clubs bonus |
-| `overpower_multiplier` | 3 | Black value needed to overpower an attack (× its value) |
+| `overpower_multiplier` | 2 | Black value needed to overpower an attack (× its value) |
 | `overpower_draw` | 1 | Cards drawn on overpower |
-| `ace_value` | 12 | What a sacrificed ace counts as |
-| `perfect_draw` | 1 | Extra cards next hand after a perfect hit |
+| `ace_value` | 14 | What a sacrificed ace counts as |
+| `perfect_draw` | 2 | Extra cards next hand after a perfect hit |
 | `burn_mode` | double | Burned card: `double` its rank in its own colour, or `swap` to the other colour |
 | `burn_limit` | 0 | Cards you may burn per round (0 = no limit) |
 | `burn_min_deck` | 5 | Cards your deck needs to burn one |

@@ -100,6 +100,87 @@ class Fire:
 		draw_multiline_string(font, Vector2(size.x * 0.44, size.y * 0.6), caption, HORIZONTAL_ALIGNMENT_LEFT, size.x * 0.54, 16, 2, Color(Style.MUTED, a))
 
 
+class Pile:
+	extends Control
+	## A pile at the bottom of the screen. The draw pile is a neat stack of face-down cards, a little
+	## staggered, with its count; the discard pile is a messy heap of face-up cards, the last played on top.
+	const PILE_CARD := Vector2(64, 90)
+	const SHOWN := 6  # cards drawn in the stack at most
+	var face_down := true
+	var _views: Array = []
+	var _sig := ""
+	var _count: Label
+
+	func _init() -> void:
+		mouse_filter = Control.MOUSE_FILTER_STOP
+		_count = Style.label("", 26, Style.WHITE)
+		_count.add_theme_font_override("font", Style.bold())
+		_count.add_theme_constant_override("outline_size", 8)
+		_count.add_theme_color_override("font_outline_color", Style.BG_A)
+		_count.z_index = 20
+		_count.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	func _ready() -> void:
+		add_child(_count)
+
+	func _draw() -> void:
+		# An empty slot is a faint outline where the cards go.
+		var r := Rect2(base_pos(), PILE_CARD)
+		draw_style_box(Style.box(Color(Style.INK, 0.04), Color(Style.INK, 0.22), 1, 8), r)
+
+	## Where the bottom card of the pile sits (inside this control).
+	func base_pos() -> Vector2:
+		return Vector2((size.x - PILE_CARD.x) / 2 - (6 if face_down else 0), size.y - PILE_CARD.y - 2)
+
+	## The global centre of the top card (target for cards landing on the pile).
+	func top_center() -> Vector2:
+		var n := mini(_views.size(), SHOWN)
+		var off := Vector2(n * 3, -n * 3) if face_down else Vector2.ZERO
+		return global_position + base_pos() + off + PILE_CARD / 2
+
+	## Shows `cards` (bottom first). Rebuilt only when the cards change.
+	func show_cards(cards: Array, count: int) -> void:
+		var top: Array = cards.slice(maxi(0, cards.size() - SHOWN))
+		var sig := str(count) + ":" + str(top.map(func(c): return c.id))
+		_count.text = str(count) if face_down and count > 0 else ""
+		if sig == _sig:
+			return
+		_sig = sig
+		for v in _views:
+			v.queue_free()
+		_views.clear()
+		for i in top.size():
+			var c = top[i]
+			var cv := CardView.new()
+			cv.set_interactive(false)
+			cv.breathing = false
+			cv.setup(c, PILE_CARD)
+			cv.pivot_offset = PILE_CARD / 2
+			if face_down:
+				cv.face_up = false
+				cv.position = base_pos() + Vector2(i * 3, -i * 3)  # neat, staggered
+			else:
+				# Messy but stable: each card keeps its own tilt and offset (from its id).
+				var h: int = int(c.id) * 2654435761 % 1000
+				cv.rotation = (h % 21 - 10) * 0.022
+				cv.position = base_pos() + Vector2(h % 11 - 5, (h / 11) % 9 - 4)
+			cv.z_index = i
+			add_child(cv)
+			_views.append(cv)
+		# The count sits in the middle of the top card.
+		var n := maxi(0, _views.size() - 1)
+		_count.size = Vector2(PILE_CARD.x, 34)
+		_count.position = base_pos() + Vector2(n * 3, -n * 3 + PILE_CARD.y / 2 - 17)
+		move_child(_count, get_child_count() - 1)
+
+	## Hides the cards (they are flying elsewhere); the next show_cards() rebuilds them.
+	func clear() -> void:
+		for v in _views:
+			v.queue_free()
+		_views.clear()
+		_sig = ""
+
+
 var main
 var _e  # engine
 var _floor_strip: FloorStrip
@@ -131,8 +212,9 @@ var _fire: Fire
 var _finish_tip: PanelContainer
 var _finish_label: RichTextLabel
 var _mods_caption: Label
-var _draw_btn: Button
-var _disc_btn: Button
+var _draw_pile: Pile
+var _disc_pile: Pile
+var _flying: Dictionary = {}  # card id -> true while a played card flies to the discard pile
 var _menu_btn: Button
 var _last_total := -1
 var _dragging := false  # a hand card is being dragged (the tooltip hides so the fire stays visible)
@@ -247,14 +329,14 @@ func _build() -> void:
 	_hand_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_hand_layer)
 
-	_draw_btn = Style.button("", Style.BLACK, 22)
-	_draw_btn.custom_minimum_size = Vector2(110, 80)
-	_draw_btn.pressed.connect(func(): _show_pile("Draw pile", _e.state.draw_pile))
-	add_child(_draw_btn)
-	_disc_btn = Style.button("", Style.BLACK, 22)
-	_disc_btn.custom_minimum_size = Vector2(110, 80)
-	_disc_btn.pressed.connect(func(): _show_pile("Discard pile", _e.state.discard))
-	add_child(_disc_btn)
+	_draw_pile = Pile.new()
+	_draw_pile.face_down = true
+	_tappable(_draw_pile, func(): _show_pile("Draw pile", _e.state.draw_pile))
+	add_child(_draw_pile)
+	_disc_pile = Pile.new()
+	_disc_pile.face_down = false
+	_tappable(_disc_pile, func(): _show_pile("Discard pile", _discard_cards()))
+	add_child(_disc_pile)
 	_main_btn = Style.button("End turn", Style.GREEN, 32)
 	_main_btn.custom_minimum_size = Vector2(200, 92)
 	_main_btn.pressed.connect(_on_main)
@@ -326,8 +408,10 @@ func _layout() -> void:
 	_lives_caption.position = Vector2(134, by - 33)
 	_lives_caption.size = Vector2(180, 24)
 	_lives_caption.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
-	_draw_btn.position = Vector2(14, by)
-	_disc_btn.position = Vector2(W - 124, by)
+	_draw_pile.position = Vector2(10, by - 14)
+	_draw_pile.size = Vector2(112, 100)
+	_disc_pile.position = Vector2(W - 122, by - 14)
+	_disc_pile.size = Vector2(112, 100)
 	# Bottom bar: Draw | lives | Play | End turn | Discard
 	var lives_w := 132.0 + maxi(3, _e.state.max_lives if _e else 3) * (MINI.x + 6)
 	_main_btn.position = Vector2(lives_w + 2, by - 6)
@@ -510,7 +594,9 @@ func _add_hand_card(c, delay: float) -> CardView:
 	_hand_layer.add_child(cv)
 	_hand_views[c.id] = cv
 	_layout_hand()
-	cv.land(delay, Vector2(0, 260))
+	# Drawn cards come from the draw pile.
+	var from := _draw_pile.top_center() - (_hand_layer.global_position + cv.position + HAND_CARD / 2)
+	cv.land(delay, from if _draw_pile.is_inside_tree() else Vector2(0, 260))
 	return cv
 
 
@@ -579,12 +665,24 @@ func _update_controls() -> void:
 		_hint_label.text = "Tap to keep %d card for next round" % _e.retain_limit()
 	else:
 		_hint_label.text = ""
-	_draw_btn.text = "Draw\n%d" % s.draw_pile.size()
-	_disc_btn.text = "Discard\n%d" % (s.discard.size() + s.played.filter(func(c): return not c.temp and not c.burned).size())
+	_sync_piles()
 	_update_fire()
 	_update_total()
 	_update_life_glow()
 	_update_tooltip()
+
+
+## The discard pile as shown: discarded cards, then this round's played cards (the last played on top).
+func _discard_cards() -> Array:
+	var s = _e.state
+	return s.discard + s.played.filter(func(c): return not c.temp and not c.burned)
+
+
+func _sync_piles() -> void:
+	var s = _e.state
+	_draw_pile.show_cards(s.draw_pile, s.draw_pile.size())
+	var disc: Array = _discard_cards().filter(func(c): return not _flying.has(c.id))
+	_disc_pile.show_cards(disc, disc.size())
 
 
 func _burn_on() -> bool:
@@ -833,12 +931,12 @@ func _on_drag_released(cv: CardView, pos: Vector2) -> void:
 		main.act(func(): _e.burn_card(bid))
 		return
 	# Free discard (option): drop the card on the Discard button.
-	if _e.can_discard() and not main.is_busy() and _disc_btn.get_global_rect().grow(30).has_point(pos) and _hand_views.has(cv.card_id):
+	if _e.can_discard() and not main.is_busy() and _disc_pile.get_global_rect().grow(30).has_point(pos) and _hand_views.has(cv.card_id):
 		var did := cv.card_id
 		_hand_views.erase(did)
 		_selected.clear()
 		var tw := cv.create_tween()
-		tw.tween_property(cv, "global_position", _disc_btn.get_global_rect().get_center() - cv.size / 2, 0.2)
+		tw.tween_property(cv, "global_position", _disc_pile.top_center() - cv.size / 2, 0.2)
 		tw.parallel().tween_property(cv, "scale", Vector2(0.3, 0.3), 0.2)
 		tw.tween_callback(cv.queue_free)
 		main.sfx.play("draw")
@@ -887,7 +985,9 @@ func _tap_enemy(cv: CardView) -> void:
 	cv.set_interactive(false)
 	cv.breathing = false
 	var center := _enemy_layer.global_position + Vector2(size.x / 2, ENEMY_CARD.y * 0.45)
-	var dest := _disc_btn.get_global_rect().get_center()
+	var dest := _disc_pile.top_center()
+	var cid := cv.card_id
+	_flying[cid] = true
 	var tw := cv.create_tween()
 	tw.tween_property(cv, "global_position", center - cv.size / 2 + Vector2(0, 40), 0.14).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	tw.parallel().tween_property(cv, "rotation", -0.18, 0.14)
@@ -902,9 +1002,14 @@ func _tap_enemy(cv: CardView) -> void:
 	tw.parallel().tween_property(cv, "scale", Vector2.ONE, 0.06)
 	tw.tween_interval(0.05)
 	tw.tween_property(cv, "global_position", dest - cv.size / 2, 0.28).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN)
-	tw.parallel().tween_property(cv, "scale", Vector2(0.3, 0.3), 0.28)
-	tw.parallel().tween_property(cv, "modulate:a", 0.4, 0.28)
-	tw.tween_callback(cv.queue_free)
+	tw.parallel().tween_property(cv, "scale", Pile.PILE_CARD / HAND_CARD, 0.28)
+	tw.parallel().tween_property(cv, "rotation", 0.0, 0.28)
+	tw.tween_callback(func():
+		# Landed: it is now the top card of the discard pile.
+		_flying.erase(cid)
+		cv.queue_free()
+		if is_instance_valid(_disc_pile):
+			_sync_piles())
 	main.sfx.play("play")
 	_layout_hand()
 
@@ -1006,6 +1111,8 @@ func play_event(ev: Dictionary) -> float:
 				main.sfx.play("draw")
 			_sync_preview()
 			return 0.15 + i * 0.06
+		Ev.DECK_RESHUFFLED:
+			return _animate_reshuffle(int(ev["count"]))
 		Ev.CARD_DRAWN:
 			var c = _find_card(ev["id"])
 			if c != null and not _hand_views.has(c.id):
@@ -1163,6 +1270,47 @@ func play_event(ev: Dictionary) -> float:
 			main.sfx.play("lose")
 			return 1.4
 	return 0.0
+
+
+## The discard pile is shuffled back: its cards fly over to the draw pile spot, flipping face down.
+func _animate_reshuffle(count: int) -> float:
+	var s = _e.state
+	var n := mini(count, 8)
+	if n <= 0:
+		return 0.0
+	var from := _disc_pile.top_center()
+	var to := _draw_pile.top_center()
+	_disc_pile.clear()
+	var pool: Array = s.draw_pile + s.hand  # any of the reshuffled cards will do for the faces
+	for i in n:
+		var cv := CardView.new()
+		cv.set_interactive(false)
+		cv.breathing = false
+		cv.setup(pool[i % maxi(1, pool.size())] if not pool.is_empty() else null, Pile.PILE_CARD)
+		cv.pivot_offset = Pile.PILE_CARD / 2
+		cv.z_index = 70 + i
+		add_child(cv)
+		cv.global_position = from - Pile.PILE_CARD / 2 + Vector2(randf_range(-6, 6), randf_range(-5, 5))
+		cv.rotation = randf_range(-0.25, 0.25)
+		var d := i * 0.06
+		var tw := cv.create_tween()
+		tw.tween_interval(d)
+		tw.tween_property(cv, "global_position", to - Pile.PILE_CARD / 2 + Vector2(i * 0.5, -i * 0.5), 0.42).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
+		tw.parallel().tween_property(cv, "rotation", 0.0, 0.42)
+		tw.parallel().tween_property(cv, "lift", -60.0, 0.21).set_trans(Tween.TRANS_SINE)
+		tw.tween_callback(cv.queue_free)
+		var tf := cv.create_tween()
+		tf.tween_interval(d + 0.12)
+		tf.tween_callback(func(): cv.flip_to(false, 0.24))
+		var tl := cv.create_tween()
+		tl.tween_interval(d + 0.21)
+		tl.tween_property(cv, "lift", 0.0, 0.21).set_trans(Tween.TRANS_SINE)
+	main.sfx.play("draw", 0.8)
+	var total := (n - 1) * 0.06 + 0.45
+	get_tree().create_timer(total).timeout.connect(func():
+		if is_instance_valid(_draw_pile):
+			_draw_pile.show_cards(s.draw_pile, s.draw_pile.size()))
+	return total
 
 
 ## Find a card object anywhere in the run state by id.

@@ -155,6 +155,23 @@ func test_diamond_needs_cards_in_the_draw_pile() -> void:
 	eq(e.state.discard.size(), 1, "discard untouched")
 
 
+func test_short_draw_pile_is_not_topped_up() -> void:
+	var e := scenario(["3D"], ["2S"], {"hand_size": 3}, {"pile": ["5S"]})
+	e.state.draw_pile = cards(e, ["9C"])
+	e.state.discard = cards(e, ["4H", "4C"])
+	e.play_cards([e.state.hand[0].id])  # 3♦ draws the 9♣: the draw pile is now empty
+	e.resolve()  # start of turn, empty draw pile: shuffle the discard back, draw up to 3
+	check(has_event(e, Ev.DECK_RESHUFFLED), "empty draw pile: reshuffled")
+	eq(e.state.hand.size(), 3, "9♣ + two from the reshuffled pile")
+	var f := scenario(["3H"], ["2S"], {"hand_size": 3}, {"pile": ["5S"]})
+	f.state.draw_pile = cards(f, ["9C"])
+	f.state.discard = cards(f, ["4H", "4C"])
+	f.play_cards([f.state.hand[0].id])
+	f.resolve()  # one card left in the draw pile: draw it, no reshuffle
+	check(not has_event(f, Ev.DECK_RESHUFFLED), "a short draw pile is not topped up")
+	eq(f.state.hand.size(), 1, "only the one card")
+
+
 func test_refill_reshuffles_discard() -> void:
 	var e := scenario(["3D"], ["2S"], {"hand_size": 2}, {"pile": ["5S"]})
 	e.state.discard = cards(e, ["4H", "4C"])

@@ -142,7 +142,7 @@ static func rules_overlay(main) -> Control:
 	var H := "[color=" + Style.hex(Style.GOLD) + "]%s[/color]"
 	var lines: Array = []
 	lines.append("%s  An enemy card is revealed. [color=%s]Black = attack[/color], [color=%s]red = shield[/color]. Its value is its rank." % [H % "EACH ROUND", Style.hex(Style.RED), Style.hex(Style.BLUE)])
-	lines.append("• Your hand is filled up to %d cards. Cards you don't play stay in your hand." % int(b["hand_size"]))
+	lines.append("• At the start of your turn you draw up to %d cards. Cards you don't play stay in your hand. When the draw pile is empty, the discard pile is shuffled into a new one first." % int(b["hand_size"]))
 	lines.append("• Drag a card onto the enemy to play it. Its effect happens at once (♦ draws a card). Only the right colour counts (green outline): red cards block attacks, black cards break shields. Tap a card to see what it does.")
 	lines.append("• Press End turn: the enemy acts and the round is resolved.")
 	lines.append("")
@@ -168,7 +168,10 @@ static func rules_overlay(main) -> Control:
 	lines.append("")
 	lines.append("%s  The suit of your last card that counted against the floor's final enemy card decides: ♠ pick any beaten card · ♣ reveal 2, take 1, remove 1 · ♥ heal a life · ♦ reveal 2, take both. %s" % [H % "REWARDS",
 		("You may decline any card to keep your deck lean." if int(b["deck_cap"]) <= 0 else "Your deck holds up to %d cards; when it is full you swap or decline." % int(b["deck_cap"]))])
-	lines.append("%s  Every floor has 4 enemy cards: %d up to Queen, then the four kings. The face cards (Jack, Queen, King) demand tribute: only %d cards in hand. Tap the ace at the top to see your mod." % [H % "THE ROAD", int(b.get("first_floor", 4)), int(b["face_hand_size"])])
+	var road := "%s  Every floor has 4 enemy cards: %d up to Queen, then the four kings." % [H % "THE ROAD", int(b.get("first_floor", 4))]
+	if int(b["face_hand_size"]) < int(b["hand_size"]):
+		road += " The face cards (Jack, Queen, King) demand tribute: only %d cards in hand." % int(b["face_hand_size"])
+	lines.append(road + " Tap the ace at the top to see your mod.")
 	var txt := "\n".join(lines)
 	var v := VBoxContainer.new()
 	var scroll := ScrollContainer.new()

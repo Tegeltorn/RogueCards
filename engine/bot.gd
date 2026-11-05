@@ -170,12 +170,25 @@ static func _search(e, hand: Array, i: int, play: Array, burn: Array, cost: int,
 		play.append(card)
 		_search(e, hand, i + 1, play, burn, cost + card.value() * 10 + 1, max_burns, full, ctx)
 		play.pop_back()
-	if burn.size() < max_burns:
+	if burn.size() < max_burns and _can_spare(e, card, burn):
 		burn.append(card)
 		card.burned = true  # so compute() values it as burned
 		_search(e, hand, i + 1, play, burn, cost + card.value() * 10 + BURN_COST, max_burns, full, ctx)
 		card.burned = false
 		burn.pop_back()
+
+
+## Burning must leave the deck at least BURN_KEEP cards of the card's colour, or later shields
+## (black needed) or attacks (red needed) can become impossible.
+const BURN_KEEP := 2
+
+
+static func _can_spare(e, card, burning: Array) -> bool:
+	var left := 0
+	for d in e.state.deck:
+		if d != card and not burning.has(d) and d.base_red() == card.base_red():
+			left += 1
+	return left >= BURN_KEEP
 
 
 ## Cost of a finished plan, or -1 if it doesn't do the job.
