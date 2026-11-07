@@ -609,37 +609,42 @@ func _update_total() -> void:
 		_carry_label.text = ("Stored shield from ♥: %d" % s.carry_shield) if s.carry_shield > 0 else ""
 		return
 	_carry_label.text = ""
+	# The big counter shows what is already played. A selected (tapped, not yet played) card
+	# only shows up as a gold "» new value" after it, and the line below says "If played:".
+	var now: Dictionary = _e.preview([])
 	var t: Dictionary = _e.preview(_selected)
+	var previewing: bool = _selected.any(func(id): return s.find_in(s.hand, id) != null)
+	var gold := Style.hex(Style.GOLD)
+	var num := func(key: String) -> String:
+		var a := int(now[key])
+		var b := int(t[key])
+		if not previewing or a == b:
+			return str(a)
+		return "%d [color=%s]» %d[/color]" % [a, gold, b]
 	var parts: Array = []
-	var ok := true
-	var exact := false
-	var total := 0
-	if int(t["block_need"]) > 0:
-		var part := "BLOCK %d / %d" % [t["block"], t["block_need"]]
+	var bn := int(t["block_need"])
+	var an := int(t["attack_need"])
+	if bn > 0:
+		var part := "BLOCK %s / %d" % [num.call("block"), bn]
 		if int(t["carry"]) > 0:
 			part += " [font_size=26][color=%s](+%d stored from [color=%s]♥[/color])[/color][/font_size]" % [Style.hex(Style.BLUE), int(t["carry"]), Style.hex(Style.RED)]
 		parts.append(part)
-		ok = ok and int(t["block"]) >= int(t["block_need"])
-		exact = int(t["block"]) == int(t["block_need"])
-		total += int(t["block"])
-	if int(t["attack_need"]) > 0 and int(t["block_need"]) == 0 and _e.lockout_risk():
+	var last_stand: bool = an > 0 and bn == 0 and _e.lockout_risk()
+	if last_stand:
 		# Last stand: break the shield OR block its desperate strike.
-		var an := int(t["attack_need"])
-		parts.append("ATTACK %d / %d" % [t["attack"], an])
+		parts.append("ATTACK %s / %d" % [num.call("attack"), an])
 		parts.append("[font_size=30]or[/font_size]")
-		parts.append("BLOCK %d / %d" % [t["block"], an])
-		var by_atk := int(t["attack"]) >= an
-		var by_blk := int(t["block"]) >= an
-		ok = by_atk or by_blk
-		exact = (by_atk and int(t["attack"]) == an) or (not by_atk and by_blk and int(t["block"]) == an)
-		total += int(t["attack"]) + int(t["block"])
-	elif int(t["attack_need"]) > 0:
-		parts.append("ATTACK %d / %d" % [t["attack"], t["attack_need"]])
-		ok = ok and int(t["attack"]) >= int(t["attack_need"])
-		exact = exact or int(t["attack"]) == int(t["attack_need"])
-		total += int(t["attack"])
-	var col := Style.hex(Style.GREEN) if ok else Style.hex(Style.WHITE)
+		parts.append("BLOCK %s / %d" % [num.call("block"), an])
+	elif an > 0:
+		parts.append("ATTACK %s / %d" % [num.call("attack"), an])
+	var j_now: Array = _judge(now, last_stand)
+	var j: Array = _judge(t, last_stand)
+	var ok: bool = j[0]
+	var exact: bool = j[1]
+	var col := Style.hex(Style.GREEN) if j_now[0] else Style.hex(Style.WHITE)
 	var fs := 40 if parts.size() > 1 else 60
+	if previewing and fs == 60:
+		fs = 52  # room for the "» new value"
 	_total_label.text = "[center][font_size=%d][color=%s]%s[/color][/font_size][/center]" % [fs, col, "  ".join(parts)]
 	if ok:
 		if exact and int(s.balance.get("perfect_draw", 0)) > 0:
@@ -672,14 +677,44 @@ func _update_total() -> void:
 			_need_label.text += "  ·  black %d/%d for overpower" % [_black_value(sel_cards), int(s.balance.get("overpower_multiplier", 2)) * int(t["block_need"])]
 	if int(t["block_need"]) == 0 and int(t["hearts"]) > 0:
 		_need_label.text += "  ·  ♥ stores %d shield" % int(t["hearts"])
-	if total != _last_total:
-		_last_total = total
+	if previewing:
+		_need_label.text = "If played: " + _need_label.text
+	# Pop and chime only when the played total changes (playing a card), not on a tap.
+	var played_total: int = j_now[2]
+	if played_total != _last_total:
+		_last_total = played_total
 		_total_label.scale = Vector2(1.08, 1.08)
 		create_tween().tween_property(_total_label, "scale", Vector2.ONE, 0.25).set_trans(Tween.TRANS_SINE)
-		if ok:
+		if j_now[0]:
 			main.sfx.play("select", 1.4)
 
 
+
+
+## [ok, exact, total] for a set of totals from preview(): is it enough, is it spot on.
+func _judge(t: Dictionary, last_stand: bool) -> Array:
+	var bn := int(t["block_need"])
+	var an := int(t["attack_need"])
+	var blk := int(t["block"])
+	var atk := int(t["attack"])
+	var ok := true
+	var exact := false
+	var total := 0
+	if bn > 0:
+		ok = blk >= bn
+		exact = blk == bn
+		total += blk
+	if last_stand:
+		var by_atk := atk >= an
+		var by_blk := blk >= an
+		ok = by_atk or by_blk
+		exact = (by_atk and atk == an) or (not by_atk and by_blk and blk == an)
+		total += atk + blk
+	elif an > 0:
+		ok = ok and atk >= an
+		exact = exact or atk == an
+		total += atk
+	return [ok, exact, total]
 
 
 ## Red ribbon over the enemy when failing this shield would cost a life (no black enemy cards left).

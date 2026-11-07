@@ -123,7 +123,7 @@ static func rules_overlay(main) -> Control:
 ♦ Block and draw 1 card (also against a shield).
 ♠ Attack × %s (rounded down).
 ♣ Attack. +%d if you play 2 or more clubs.
-Tip: select a single card to see what it does.
+Tip: tap a card to see what it does. The counter shows the new total in gold after a » until you drag the card onto the enemy.
 
 %s  If your block is too low you lose a life (a miss of %d or more costs 2). %s
 %s  Block exactly the attack, or break a shield with exactly its value: draw %d extra card in your next hand.
